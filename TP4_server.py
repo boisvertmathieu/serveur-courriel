@@ -43,8 +43,6 @@ class Server:
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 
-        self.message = ""
-
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
         Cette méthode utilise le module glosocket pour récupérer un message.
@@ -55,16 +53,21 @@ class Server:
         s’il ne représente pas un dictionnaire du format GLO_message, ou si
         le résultat est None, le socket client est fermé et retiré des listes.
         """
-        jsondata = glosocket.recv_msg(socket)
+        jsondata = glosocket.recv_msg(source)
         if jsondata is None:
-            socket.close()
-            self._connected_client_list.remove(socket)
-            self._client_socket_list.remove(socket)
+            source.close()
+            self._connected_client_list.remove(source)
+            self._client_socket_list.remove(source)
             self.client_count -= 1
 
         try:
-            data = json.loads(jsondata)
+            # TODO : Valider si data est de type GLO_message
+            json_data = json.loads(jsondata)
+            data = TP4_utils.GLO_message(header=json_data["header"], data={
+                                         "username": json_data["username"], "password": json_data["password"]})
+
             # Retourner les données contenu dans data sous forme de GLO_message
+            return data
         except json.JSONDecodeError:
             return
 
@@ -81,8 +84,8 @@ class Server:
         )
 
         for client in waiting_list:
-            self.message = glosocket.recv_msg(client)
-            if (client == self._server_socket):
+            self.data = self._recv_data(client)
+            if client == self._server_socket:
                 self._authenticate_client(client)
             else:
                 self._process_client(client)
@@ -140,7 +143,7 @@ class Server:
 
         Le GLO_message retourné contient dans le champ "data" une liste
         de chaque sujet, sa source et un numéro (commence à 1).
-        Si le nom d’utilisateur est invalide, le GLO_message retourné 
+        Si le nom d’utilisateur est invalide, le GLO_message retourné
         indique l’erreur au client.
         """
         # TODO
@@ -150,8 +153,8 @@ class Server:
         Cette méthode récupère le contenu du courriel choisi par l’utilisateur.
 
         Le GLO_message retourné contient dans le champ « data » la représentation
-        en chaine de caractère du courriel chargé depuis le fichier à l’aide du 
-        module email. Si le choix ou le nom d’utilisateur est incorrect, le 
+        en chaine de caractère du courriel chargé depuis le fichier à l’aide du
+        module email. Si le choix ou le nom d’utilisateur est incorrect, le
         GLO_message retourné indique l’erreur au client.
         """
         # TODO
@@ -180,7 +183,7 @@ class Server:
         Le GLO_message retourné contient dans le champ « data » les entrées :
         - « count », avec le nombre de courriels,
         - « folder_size », avec la taille totale du dossier en octets.
-        Si le nom d’utilisateur est invalide, le GLO_message retourné 
+        Si le nom d’utilisateur est invalide, le GLO_message retourné
         indique l’erreur au client.
         """
         # TODO

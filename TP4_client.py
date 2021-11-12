@@ -65,7 +65,7 @@ class Client:
         - Traite la réponse du serveur
         """
         while True:
-            choix: str = input("1. Créer un compte\n2. Se connecter\n")
+            choix: str = input(TP4_utils.CLIENT_AUTH_CHOICE + "\n")
             if re.search(r"^1|2$", choix) is not None:
                 # Connexion ou création de l'utilisateur
                 username: str = input("\nEntrez votre nom d'utilisateur: ")
