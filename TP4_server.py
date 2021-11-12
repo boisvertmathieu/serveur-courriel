@@ -18,12 +18,12 @@ class Server:
     def __init__(self) -> None:
         """
         Cette méthode est automatiquement appelée à l’instanciation du serveur, elle doit :
-        - Initialiser le socket du serveur et le mettre en écoute. 
-        - Créer le dossier des données pour le serveur dans le dossier courant s’il n’existe pas. 
+        - Initialiser le socket du serveur et le mettre en écoute.
+        - Créer le dossier des données pour le serveur dans le dossier courant s’il n’existe pas.
         - Préparer deux listes vides pour les sockets clients.
         - Compiler un pattern Regex qui sera utilisé pour vérifier les adresses courriel.
 
-        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests. 
+        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests.
         Vous pouvez cependant ajouter des attributs supplémentaires.
         """
         self._client_socket_list: list[socket.socket] = []
@@ -36,30 +36,43 @@ class Server:
         socket_serveur.listen(5)
         self._server_socket = socket_serveur
 
-        if(not os.path.isdir(TP4_utils.SERVER_DATA_DIR)):
+        if not os.path.isdir(TP4_utils.SERVER_DATA_DIR):
             os.mkdir(TP4_utils.SERVER_DATA_DIR)
         self._server_data_path = TP4_utils.SERVER_DATA_DIR
 
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 
+        self.message = ""
+
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
         Cette méthode utilise le module glosocket pour récupérer un message.
         Elle doit être appelée systématiquement pour recevoir des données d’un client.
 
-        Le message attendu est une chaine de caractère représentant un JSON 
-        valide, qui est décodé avec le module json. Si le JSON est invalide, 
-        s’il ne représente pas un dictionnaire du format GLO_message, ou si 
+        Le message attendu est une chaine de caractère représentant un JSON
+        valide, qui est décodé avec le module json. Si le JSON est invalide,
+        s’il ne représente pas un dictionnaire du format GLO_message, ou si
         le résultat est None, le socket client est fermé et retiré des listes.
         """
-        # TODO
+        jsondata = glosocket.recv_msg(socket)
+        if jsondata is None:
+            socket.close()
+            self._connected_client_list.remove(socket)
+            self._client_socket_list.remove(socket)
+            self.client_count -= 1
+
+        try:
+            data = json.loads(jsondata)
+            # Retourner les données contenu dans data sous forme de GLO_message
+        except json.JSONDecodeError:
+            return
 
     def _main_loop(self) -> None:
         """
         Boucle principale du serveur.
 
-        Le serveur utilise le module select pour récupérer les sockets en 
+        Le serveur utilise le module select pour récupérer les sockets en
         attente puis appelle l’une des méthodes _accept_client, _process_client
         ou _authenticate_client pour chacun d’entre eux.
         """
@@ -68,28 +81,15 @@ class Server:
         )
 
         for client in waiting_list:
-            if(client == self._server_socket):
-                self._accept_client(client)
+            self.message = glosocket.recv_msg(client)
+            if (client == self._server_socket):
+                self._authenticate_client(client)
             else:
-                # On traite le client
-                message = glosocket.recv_msg(client)
-                # Si le client s'est déconnecté
-                if(message is None):
-                    self._client_socket_list.remove(client)
-                    self._connected_client_list.remove(client)
-                    self.client_count -= 1
-                    return
-                # On récupère l'entête du socket et on traite correctement le client
-                header, data = message.split(maxsplit=1)
-                if(header == TP4_utils.message_header.AUTH_REGISTER or
-                   header == TP4_utils.message_header.AUTH_LOGIN):
-                    self._authenticate_client(client)
-                else:
-                    self._process_client(client)
+                self._process_client(client)
 
     def _accept_client(self) -> None:
         """
-        Cette méthode accepte une connexion avec un nouveau socket client et 
+        Cette méthode accepte une connexion avec un nouveau socket client et
         l’ajoute aux listes appropriées.
         """
         # On traite le nouveau client
@@ -112,6 +112,17 @@ class Server:
         est également ajouté aux listes appropriées.
         """
         # TODO
+        if self.message is None:
+            self._client_socket_list.remove(client_socket)
+            self._connected_client_list.remove(client_socket)
+            self.client_count -= 1
+            return
+
+        header, data = self.message.split(maxsplit=1)
+        if header == TP4_utils.message_header.AUTH_LOGIN:
+            a = 1
+        elif header == TP4_utils.message_header.AUTH_REGISTER:
+            a = 2
 
     def _process_client(self, client_socket: socket.socket) -> None:
         """
