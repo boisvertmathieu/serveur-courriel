@@ -29,14 +29,18 @@ class Server:
         self._client_socket_list: list[socket.socket] = []
         self._connected_client_list: list[socket.socket] = []
 
-        # TODO
-        self._server_socket = None
+        socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        socket.bind(("localhost", 11037))
+        socket.listen(5)
+        self._server_socket = socket
 
-        # TODO
-        self._server_data_path = ""
+        if(not os.path.isdir("data")):
+            os.mkdir("data")
+        self._server_data_path = "data"
 
-        # TODO
-        self._email_verificator = re.compile(r"")
+        self._email_verificator = re.compile(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
@@ -59,6 +63,11 @@ class Server:
         ou _authenticate_client pour chacun d’entre eux.
         """
         # TODO
+        (socket_client, adresse_client) = self._server_socket.accept()
+        print(
+            f"Connexion d'un nouveau client: {self._connected_client_list.count}")
+        self._client_socket_list.append(socket_client)
+        self._connected_client_list.append(adresse_client)
 
     def _accept_client(self) -> None:
         """

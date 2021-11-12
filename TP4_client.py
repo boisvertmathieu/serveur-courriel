@@ -20,25 +20,27 @@ class Client:
         - Initialiser le socket du client et le connecter à l’adresse en paramètre.
         - Préparer un attribut « _logged_in » pour garder en mémoire l’état de
             l’authentification avec le serveur.
-        - Préparer un attribut « _username » pour garder en mémoire le nom 
+        - Préparer un attribut « _username » pour garder en mémoire le nom
             d’utilisateur utilisé pour l’authentification.
 
-        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests. 
+        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests.
         Vous pouvez cependant ajouter des attributs supplémentaires.
         """
         self._logged_in = False
         self._username = ""
 
-        # TODO
-        self._socket = None
+        soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        soc.connect((destination, 11037))
+
+        self.socket_client = soc
 
     def _recv_data(self) -> TP4_utils.GLO_message:
         """
         Cette fonction utilise le module glosocket pour récupérer un message.
         Elle doit être appelée systématiquement pour recevoir des données du serveur.
 
-        Le message attendu est une chaine de caractère représentant un GLO_message 
-        valide, qui est décodé avec le module json. Si le JSON est invalide 
+        Le message attendu est une chaine de caractère représentant un GLO_message
+        valide, qui est décodé avec le module json. Si le JSON est invalide
         ou le résultat est None, le programme termine avec un code -1.
         """
         # TODO
@@ -54,7 +56,17 @@ class Client:
         - Transmet la requête au serveur
         - Traite la réponse du serveur
         """
-        # TODO
+        while(True):
+            choix: str = input("1. Créer un compte\n2. Se connecter\n")
+            if(re.search(r"^1|2$", choix) is not None):
+                # Connexion ou création de l'utilisateur
+                username: str = input("\nEntrez votre nom d'utilisateur: ")
+                password: str = input("Entrez votre mot de passe: ")
+
+                self.socket_client.send((username, password).encode("utf8"))
+
+            else:
+                print("\nSélection invalide.\n")
 
     def _main_loop(self) -> None:
         """
