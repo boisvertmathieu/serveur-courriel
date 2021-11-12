@@ -28,16 +28,17 @@ class Server:
         """
         self._client_socket_list: list[socket.socket] = []
         self._connected_client_list: list[socket.socket] = []
+        self.client_count = 0
 
-        socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        socket.bind(("localhost", 11037))
-        socket.listen(5)
-        self._server_socket = socket
+        socket_serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        socket_serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        socket_serveur.bind(("localhost", TP4_utils.SOCKET_PORT))
+        socket_serveur.listen(5)
+        self._server_socket = socket_serveur
 
-        if(not os.path.isdir("data")):
-            os.mkdir("data")
-        self._server_data_path = "data"
+        if(not os.path.isdir(TP4_utils.SERVER_DATA_DIR)):
+            os.mkdir(TP4_utils.SERVER_DATA_DIR)
+        self._server_data_path = TP4_utils.SERVER_DATA_DIR
 
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
@@ -62,19 +63,44 @@ class Server:
         attente puis appelle l’une des méthodes _accept_client, _process_client
         ou _authenticate_client pour chacun d’entre eux.
         """
-        # TODO
-        (socket_client, adresse_client) = self._server_socket.accept()
-        print(
-            f"Connexion d'un nouveau client: {self._connected_client_list.count}")
-        self._client_socket_list.append(socket_client)
-        self._connected_client_list.append(adresse_client)
+        waiting_list, _, _ = select.select(
+            [self._server_socket] + self._client_socket_list, [], []
+        )
+
+        for client in waiting_list:
+            if(client == self._server_socket):
+                self._accept_client(client)
+            else:
+                # On traite le client
+                message = glosocket.recv_msg(client)
+                # Si le client s'est déconnecté
+                if(message is None):
+                    self._client_socket_list.remove(client)
+                    self._connected_client_list.remove(client)
+                    self.client_count -= 1
+                    return
+                # On récupère l'entête du socket et on traite correctement le client
+                header, data = message.split(maxsplit=1)
+                if(header == TP4_utils.message_header.AUTH_REGISTER or
+                   header == TP4_utils.message_header.AUTH_LOGIN):
+                    self._authenticate_client(client)
+                else:
+                    self._process_client(client)
 
     def _accept_client(self) -> None:
         """
         Cette méthode accepte une connexion avec un nouveau socket client et 
         l’ajoute aux listes appropriées.
         """
-        # TODO
+        # On traite le nouveau client
+        client, _ = self._server_socket.accept()
+        self._client_socket_list.append(client)
+        self._connected_client_list.append(client)
+        self.client_count += 1
+        print(f"Nouveau client connecté : {self.client_count}")
+
+        glosocket.send_msg(client, "Bonjour")
+        return
 
     def _authenticate_client(self, client_socket: socket.socket) -> None:
         """

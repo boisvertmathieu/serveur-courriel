@@ -30,7 +30,7 @@ class Client:
         self._username = ""
 
         soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        soc.connect((destination, 11037))
+        soc.connect((destination, TP4_utils.SOCKET_PORT))
 
         self.socket_client = soc
 
@@ -43,7 +43,15 @@ class Client:
         valide, qui est décodé avec le module json. Si le JSON est invalide
         ou le résultat est None, le programme termine avec un code -1.
         """
-        # TODO
+        answer = json.loads(glosocket.recv_msg(self._socket))
+        if(answer.get("header") == TP4_utils.message_header.OK and answer.get("data") is not None):
+            ret = TP4_utils.GLO_message(
+                header=answer["header"],
+                data=answer["data"]
+            )
+        else:
+            ret = -1
+        return ret
 
     def _authentication(self) -> None:
         """
