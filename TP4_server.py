@@ -28,7 +28,7 @@ class Server:
         """
         self._client_socket_list: list[socket.socket] = []
         self._connected_client_list: list[socket.socket] = []
-        self.client_count = 0
+        self._client_count = 0
 
         socket_serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         socket_serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -43,6 +43,8 @@ class Server:
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 
+        self.data = ""
+
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
         Cette méthode utilise le module glosocket pour récupérer un message.
@@ -53,23 +55,23 @@ class Server:
         s’il ne représente pas un dictionnaire du format GLO_message, ou si
         le résultat est None, le socket client est fermé et retiré des listes.
         """
-        jsondata = glosocket.recv_msg(source)
-        if jsondata is None:
+        message = glosocket.recv_msg(source)
+        if message is None:
             source.close()
             self._connected_client_list.remove(source)
             self._client_socket_list.remove(source)
-            self.client_count -= 1
+            self._client_count -= 1
+        else:
+            try:
+                # TODO : Valider si data est de type GLO_message
+                json_data = json.loads(message)
+                data = TP4_utils.GLO_message(header=json_data["header"], data={
+                                             "username": json_data["username"], "password": json_data["password"]})
 
-        try:
-            # TODO : Valider si data est de type GLO_message
-            json_data = json.loads(jsondata)
-            data = TP4_utils.GLO_message(header=json_data["header"], data={
-                                         "username": json_data["username"], "password": json_data["password"]})
-
-            # Retourner les données contenu dans data sous forme de GLO_message
-            return data
-        except json.JSONDecodeError:
-            return
+                # Retourner les données contenu dans data sous forme de GLO_message
+                return data
+            except json.JSONDecodeError:
+                return
 
     def _main_loop(self) -> None:
         """
@@ -99,8 +101,8 @@ class Server:
         client, _ = self._server_socket.accept()
         self._client_socket_list.append(client)
         self._connected_client_list.append(client)
-        self.client_count += 1
-        print(f"Nouveau client connecté : {self.client_count}")
+        self._client_count += 1
+        print(f"Nouveau client connecté : {self._client_count}")
 
         glosocket.send_msg(client, "Bonjour")
         return
@@ -115,17 +117,40 @@ class Server:
         est également ajouté aux listes appropriées.
         """
         # TODO
-        if self.message is None:
+        if self.data is None:
             self._client_socket_list.remove(client_socket)
             self._connected_client_list.remove(client_socket)
-            self.client_count -= 1
+            self._client_count -= 1
             return
 
-        header, data = self.message.split(maxsplit=1)
+        username = self.data["data"]["password"]
+        password = self.data["data"]["username"]
+        header = self.data["header"]
+        # Connexion
         if header == TP4_utils.message_header.AUTH_LOGIN:
-            a = 1
+            user_datafile_path = self._server_data_path + username
+            # On valide si un fichier contenant le password du username existe (si le user existe)
+            if not os.path.isfile(user_datafile_path):
+                # Envoyer message erreur au client
+                glosocket.send_msg(
+                    client_socket, "Nom d'utilisateur invalide !!!")
+            else:
+                # On va comparer le password avec celui contenu dans le fichier
+                with open(user_datafile_path) as file:
+                    if password != file.read().replace('\n', ''):
+                        glosocket.send_msg(
+                            client_socket, "Mot de passe invalide !!!")
+
+        # Création d'un compte
         elif header == TP4_utils.message_header.AUTH_REGISTER:
-            a = 2
+            # On valide si le username est déjà prit
+            if os.path.isFile(user_datafile_path) is not None:
+                glosocket.send_msg(
+                    client_socket, "Le nom d'utilisateur est déjà prit !!!")
+            # Valider sur le username et password sont invalide
+            if re.search(r"[A-Za-z0-9]{9,}", password) is not None:
+                glosocket.send_msg(
+                    client_socket, "Le mot de passe est invalide !!!")
 
     def _process_client(self, client_socket: socket.socket) -> None:
         """
