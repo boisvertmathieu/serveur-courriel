@@ -185,11 +185,11 @@ class Server:
             if(action is TP4_utils.message_header.INBOX_READING_REQUEST):
                 username = message["data"]["username"]
                 self._get_subject_list(username)
-            elif(action is TP4_utils.INBOX_READING_CHOICE):
+            elif(action is TP4_utils.message_header.INBOX_READING_CHOICE):
                 self._get_email(message["data"])
-            elif(action is TP4_utils.EMAIL_SENDING):
+            elif(action is TP4_utils.message_header.EMAIL_SENDING):
                 self._send_email(message["data"])
-            elif(action is TP4_utils.STATS_REQUEST):
+            elif(action is TP4_utils.message_header.STATS_REQUEST):
                 username = message["data"]["username"]
                 self._get_stats(username)
 
