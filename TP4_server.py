@@ -41,7 +41,7 @@ class Server:
         self._server_data_path = TP4_utils.SERVER_DATA_DIR
 
         self._email_verificator = re.compile(
-            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+            r"\b[A-Za-z0-9._%+-]+@ulaval\.ca")
 
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
@@ -170,6 +170,11 @@ class Server:
                 file = open(user_datafile_path + "/passwd", "w")
                 file.write(hashlib.sha384(password.encode()).hexdigest())
                 file.close()
+
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.OK,
+                    "data": {}
+                }))
 
     def _process_client(self, client_socket: socket.socket) -> None:
         """
