@@ -208,8 +208,29 @@ class Server:
         en chaine de caractère du courriel chargé depuis le fichier à l’aide du
         module email. Si le choix ou le nom d’utilisateur est incorrect, le
         GLO_message retourné indique l’erreur au client.
+        if(usernameExists):
         """
-        # TODO
+        usernameExists = os.path.isdir("./server_data/{username}")
+        if(usernameExists):
+           
+            emailExists = os.path.isfile("./server_data/{username}/" + data)
+            if(emailExists):
+                with open("./server_data/{username}/{email}") as file:
+                    """utiliser os pour prendre les infos du email"""
+                    number = ""
+                    subject = ""
+                    source = ""
+
+                    file = open("./server_data/{username}/{email}", "r")
+                    content = file.read()
+                    file.close()
+                    retour = TP4_utils.EMAIL_DISPLAY.format(
+                        number=number, subject=subject, source=source, content=content)
+                    return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data=retour)
+            else:
+                return TP4_utils.GLO_message(header=TP4_utils.message_header.Error, data="Le message n'existe pas")
+        else: 
+            return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data="Cet utilisateur n'existe pas")
 
     def _send_email(self, email_string: str) -> TP4_utils.GLO_message:
         """
