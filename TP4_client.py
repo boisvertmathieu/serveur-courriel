@@ -44,7 +44,7 @@ class Client:
         ou le résultat est None, le programme termine avec un code -1.
         """
         answer = json.loads(glosocket.recv_msg(self._socket))
-        if(answer.get("header") == TP4_utils.message_header.OK and answer.get("data") is not None):
+        if answer.get("header") == TP4_utils.message_header.OK and answer.get("data") is not None:
             ret = TP4_utils.GLO_message(
                 header=answer["header"],
                 data=answer["data"]
@@ -64,9 +64,9 @@ class Client:
         - Transmet la requête au serveur
         - Traite la réponse du serveur
         """
-        while(True):
-            choix: str = input("1. Créer un compte\n2. Se connecter\n")
-            if(re.search(r"^1|2$", choix) is not None):
+        while True:
+            choix: str = input(TP4_utils.CLIENT_AUTH_CHOICE + "\n")
+            if re.search(r"^1|2$", choix) is not None:
                 # Connexion ou création de l'utilisateur
                 username: str = input("\nEntrez votre nom d'utilisateur: ")
                 password: str = input("Entrez votre mot de passe: ")
@@ -84,7 +84,22 @@ class Client:
         choix et appelle l’une des fonctions _reading, _sending ou _get_stats
         ou quitte avec un code 0.
         """
-        # TODO
+        print(TP4_utils.CLIENT_USE_CHOICE)
+        choice = {
+            1: self._reading,
+            2: self._sending,
+            3: self._get_stats,
+            4: "quit"
+        }
+        option = 0
+        while option not in {1, 2, 3, 4}:
+            option = int(input("Choisissez une option : "))
+        # Quitte avec code 0
+        if option == 4:
+            return 0
+        # Appelle la bonne fonction selon le choix
+        else:
+            choice[option]()
 
     def _reading(self) -> None:
         """
@@ -144,7 +159,7 @@ class Client:
 def main() -> NoReturn:
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--destination",
-                        dest="destination",  type=str, action="store", required=True)
+                        dest="destination", type=str, action="store", required=True)
     destination = parser.parse_args().destination
     Client(destination).run()
 
