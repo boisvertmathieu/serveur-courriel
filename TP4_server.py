@@ -18,12 +18,12 @@ class Server:
     def __init__(self) -> None:
         """
         Cette méthode est automatiquement appelée à l’instanciation du serveur, elle doit :
-        - Initialiser le socket du serveur et le mettre en écoute. 
-        - Créer le dossier des données pour le serveur dans le dossier courant s’il n’existe pas. 
+        - Initialiser le socket du serveur et le mettre en écoute.
+        - Créer le dossier des données pour le serveur dans le dossier courant s’il n’existe pas.
         - Préparer deux listes vides pour les sockets clients.
         - Compiler un pattern Regex qui sera utilisé pour vérifier les adresses courriel.
 
-        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests. 
+        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests.
         Vous pouvez cependant ajouter des attributs supplémentaires.
         """
         self._client_socket_list: list[socket.socket] = []
@@ -48,12 +48,23 @@ class Server:
         Cette méthode utilise le module glosocket pour récupérer un message.
         Elle doit être appelée systématiquement pour recevoir des données d’un client.
 
-        Le message attendu est une chaine de caractère représentant un JSON 
-        valide, qui est décodé avec le module json. Si le JSON est invalide, 
-        s’il ne représente pas un dictionnaire du format GLO_message, ou si 
+        Le message attendu est une chaine de caractère représentant un JSON
+        valide, qui est décodé avec le module json. Si le JSON est invalide,
+        s’il ne représente pas un dictionnaire du format GLO_message, ou si
         le résultat est None, le socket client est fermé et retiré des listes.
         """
-        # TODO
+
+        answer = json.loads(glosocket.recv_msg(self._socket))
+        if(answer.get("header") == TP4_utils.message_header.OK and answer.get("data") is not None):
+            message = TP4_utils.GLO_message(
+                header=answer["header"],
+                data=answer["data"]
+            )
+            return message
+        else:
+            source.close()
+            self._connected_client_list.remove(source)
+            self._client_socket_list.remove(source)
 
     def _main_loop(self) -> None:
         """
@@ -121,7 +132,19 @@ class Server:
         Sinon, la méthode traite la requête et répond au client avec un JSON
         conformant à la classe d’annotation GLO_message.
         """
-        # TODO
+        message = glosocket.recv_msg(client_socket)
+        if(message is not None):
+            action = message["header"]
+            if(action is TP4_utils.message_header.INBOX_READING_REQUEST):
+                username = message["data"]["username"]
+                self._get_subject_list(username)
+            elif(action is TP4_utils.INBOX_READING_CHOICE):
+                self._get_email(message["data"])
+            elif(action is TP4_utils.EMAIL_SENDING):
+                self._send_email(message["data"])
+            elif(action is TP4_utils.STATS_REQUEST):
+                username = message["data"]["username"]
+                self._get_stats(username)
 
     def _get_subject_list(self, username: str) -> TP4_utils.GLO_message:
         """
@@ -132,7 +155,21 @@ class Server:
         Si le nom d’utilisateur est invalide, le GLO_message retourné 
         indique l’erreur au client.
         """
-        # TODO
+        usernameExists = os.path.isdir("./server_data/{username}")
+        if(usernameExists):
+            emails = os.listdir("./server_data/{username}")
+            retour: dict
+            for email in emails:
+                """utiliser os pour prendre les infos de chaque email"""
+                number = ""
+                subject = ""
+                source = ""
+                retour[number] = TP4_utils.SUBJECT_DISPLAY.format(
+                    number=number, subject=subject, source=source)
+
+            return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data=retour)
+        else:
+            return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data=None)
 
     def _get_email(self, data: dict) -> TP4_utils.GLO_message:
         """
