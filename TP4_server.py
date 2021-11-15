@@ -43,8 +43,6 @@ class Server:
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 
-        self.data = ""
-
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
         Cette méthode utilise le module glosocket pour récupérer un message.
@@ -73,7 +71,6 @@ class Server:
             except json.JSONDecodeError:
                 return
 
-
     def _main_loop(self) -> None:
         """
         Boucle principale du serveur.
@@ -87,7 +84,6 @@ class Server:
         )
 
         for client in waiting_list:
-            self.data = self._recv_data(client)
             if client == self._server_socket:
                 self._authenticate_client(client)
             else:
@@ -117,41 +113,63 @@ class Server:
         conformant à la classe d’annotation GLO_message. Si nécessaire, le client
         est également ajouté aux listes appropriées.
         """
-        # TODO
-        if self.data is None:
-            self._client_socket_list.remove(client_socket)
-            self._connected_client_list.remove(client_socket)
-            self._client_count -= 1
-            return
+        data = self._recv_data(client_socket)
+        username = data["data"]["password"]
+        password = data["data"]["username"]
+        header = data["header"]
 
-        username = self.data["data"]["password"]
-        password = self.data["data"]["username"]
-        header = self.data["header"]
+        user_datafile_path = self._server_data_path + username
         # Connexion
         if header == TP4_utils.message_header.AUTH_LOGIN:
-            user_datafile_path = self._server_data_path + username
-            # On valide si un fichier contenant le password du username existe (si le user existe)
+            # On valide si un fichier correspondant au username existe
             if not os.path.isfile(user_datafile_path):
                 # Envoyer message erreur au client
-                glosocket.send_msg(
-                    client_socket, "Nom d'utilisateur invalide !!!")
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": {
+                        "message": "Nom d'utilisateur incorrect."
+                    }
+                }))
             else:
-                # On va comparer le password avec celui contenu dans le fichier
-                with open(user_datafile_path) as file:
-                    if password != file.read().replace('\n', ''):
-                        glosocket.send_msg(
-                            client_socket, "Mot de passe invalide !!!")
+                file = open(user_datafile_path + "/passwd", "r")
+                content = file.read().replace('\n', '')
+                if hashlib.sha384(password.encode()).hexdigest() != content:
+                    glosocket.send_msg(client_socket, json.dumps({
+                        "header": TP4_utils.message_header.ERROR,
+                        "data": {
+                            "message": "Mot de passe incorrect."
+                        }
+                    }))
+                else:
+                    glosocket.send_msg(client_socket, json.dumps({
+                        "header": TP4_utils.message_header.OK, "data": {}
+                    }))
+
+                file.close()
 
         # Création d'un compte
         elif header == TP4_utils.message_header.AUTH_REGISTER:
             # On valide si le username est déjà prit
-            if os.path.isFile(user_datafile_path) is not None:
-                glosocket.send_msg(
-                    client_socket, "Le nom d'utilisateur est déjà prit !!!")
+            if os.path.isdir(user_datafile_path):
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": {
+                        "message": "Le nom d'utilisateur est déjà prit."
+                    }}))
             # Valider sur le username et password sont invalide
-            if re.search(r"[A-Za-z0-9]{9,}", password) is not None:
-                glosocket.send_msg(
-                    client_socket, "Le mot de passe est invalide !!!")
+            elif re.search(r"^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])([a-zA-Z0-9]+){9,}$", password) is None:
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": {
+                        "message": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."
+                    }
+                }))
+            else:
+                # Créer un fichier nommé 'passwd' dans user_datafile_path et encrypter le password dans le fichier
+                os.touch(user_datafile_path + "/passwd")
+                file = open(user_datafile_path + "/passwd", "w")
+                file.write(hashlib.sha384(password.encode()).hexdigest())
+                file.close()
 
     def _process_client(self, client_socket: socket.socket) -> None:
         """
@@ -212,7 +230,7 @@ class Server:
         """
         usernameExists = os.path.isdir("./server_data/{username}")
         if(usernameExists):
-           
+
             emailExists = os.path.isfile("./server_data/{username}/" + data)
             if(emailExists):
                 with open("./server_data/{username}/{email}") as file:
@@ -229,7 +247,7 @@ class Server:
                     return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data=retour)
             else:
                 return TP4_utils.GLO_message(header=TP4_utils.message_header.Error, data="Le message n'existe pas")
-        else: 
+        else:
             return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data="Cet utilisateur n'existe pas")
 
     def _send_email(self, email_string: str) -> TP4_utils.GLO_message:
