@@ -356,7 +356,7 @@ class Server:
 
         return TP4_utils.GLO_message(
             header=TP4_utils.message_header.OK,
-            data={"count": nombre_de_fichier, "folder_size": taille_du_dossier}
+            data={"count": nombre_de_fichier, "size": taille_du_dossier}
         )
 
     def run(self) -> NoReturn:
