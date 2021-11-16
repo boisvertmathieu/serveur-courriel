@@ -319,16 +319,22 @@ class Server:
             with smtplib.SMTP(smtp_server, timeout=10) as server:
                 message = email.message_from_string(email_string)
                 server.send_message(message)
-                return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data="Le courriel a été envoyé avec succès.")
+                return TP4_utils.GLO_message(
+                    header=TP4_utils.message_header.OK,
+                    data="Le courriel a été envoyé avec succès."
+                )
         except smtplib.smtplib.SMTPException:
             return TP4_utils.GLO_message(
-                header=TP4_utils.message_header.ERROR, data="Le message n'a pas pu être envoyé")
+                header=TP4_utils.message_header.ERROR,
+                data="Le message n'a pas pu être envoyé"
+            )
         except socket.timeout:
             return TP4_utils.GLO_message(
-                header=TP4_utils.message_header.ERROR, data="La connexion au serveur SMTP n'a pas pu être établis")
+                header=TP4_utils.message_header.ERROR,
+                data="La connexion au serveur SMTP n'a pas pu être établis"
+            )
 
-
-   def _get_stats(self, username: str) -> TP4_utils.GLO_message:
+    def _get_stats(self, username: str) -> TP4_utils.GLO_message:
         """
         Cette méthode récupère les statistiques liées à un utilisateur.
 
@@ -348,8 +354,10 @@ class Server:
             os.path.getsize(self._server_data_path + username + "/" + name) for name in os.listdir(
                 self._server_data_path + username) if os.path.isfile(name))
 
-        return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data="count {}\nfolder_size {}".format(
-            nombre_de_fichier, taille_du_dossier))
+        return TP4_utils.GLO_message(
+            header=TP4_utils.message_header.OK,
+            data={"count": nombre_de_fichier, "folder_size": taille_du_dossier}
+        )
 
     def run(self) -> NoReturn:
         """
