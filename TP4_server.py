@@ -244,7 +244,7 @@ class Server:
                         subject = content.split('\\n')[2].split(' ')[1]
                         source = content.split('\\n')[0].split(' ')[1]
                         subjects.append(TP4_utils.SUBJECT_DISPLAY.format(number=number, subject=subject, source=source))
-            return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data=subjects)
+            return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data={"subjects": subjects})
 
         else:
             return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data=None)
@@ -260,25 +260,28 @@ class Server:
         if(usernameExists):
         """
 
-        if os.path.isdir(self._server_data_path + "test"):
-            email_exists = os.path.isfile("./server_data/{username}/" + data)
-            if email_exists:
-                with open("./server_data/{username}/{email}") as file:
-                    """utiliser os pour prendre les infos du email"""
-                    number = ""
-                    subject = ""
-                    source = ""
+        message = self.message
+        username = message["data"]["username"]
+        user_dir_path = self._server_data_path + username
+        choix = message["data"]["choice"]
 
-                    file = open("./server_data/{username}/{email}", "r")
-                    content = file.read()
-                    file.close()
-                    retour = TP4_utils.EMAIL_DISPLAY.format(
-                        number=number, subject=subject, source=source, content=content)
-                    return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data=retour)
-            else:
-                return TP4_utils.GLO_message(header=TP4_utils.message_header.Error, data="Le message n'existe pas")
+        filename = choix + '-' + username
+        if os.path.isfile(os.path.join(user_dir_path, filename)):
+            with open(os.path.join(user_dir_path, filename)) as f:
+                formatted_content = f.read().split('\\n')
+                source = formatted_content[0].split(' ')[1]
+                destination = formatted_content[1].split(' ')[1]
+                subject = formatted_content[2].split(' ')[1]
+                content = formatted_content[-2]
+                return TP4_utils.GLO_message(
+                    header=TP4_utils.message_header.OK,
+                    data={"source": source, "destination": destination, "subject": subject, "content": content}
+                )
         else:
-            return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data="Cet utilisateur n'existe pas")
+            return TP4_utils.GLO_message(
+                header=TP4_utils.message_header.ERROR,
+                data="Le numéro du courriel choisi est invalide."
+            )
 
     def _send_email(self, email_string: str) -> TP4_utils.GLO_message:
         """

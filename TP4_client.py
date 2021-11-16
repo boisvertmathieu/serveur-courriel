@@ -136,18 +136,16 @@ class Client:
         if message["header"] == TP4_utils.message_header.ERROR:
             print("\nErreur lors de la récupération des courriels.\n")
             return
-
-        if not len(message["data"]["subjects"]):
+        elif not len(message["data"]["subjects"]):
             print("\nIl y a aucun courriels.\n")
             return
 
         print("\nListe des sujets: ")
         for subject in message["data"]["subjects"]:
             print(subject)
-        print("\n(Si plusieurs numéros, séparez ceux-ci par une virgule. Ex: 1,2,3,4)")
-        choix: str = input("Entrez les numéros de courriel que vous souhaitez consulter: ")
 
-        if re.search(r"^[0-9]+(,[0-9]+)*$", choix) is None:
+        choix: str = input("Entrez le numéro du courriel que vous voulez consulter: ")
+        if re.search(r"^[0-9]$", choix) is None:
             print("\nErreur lors du choix des courriels disponibles.\n")
             return
 
@@ -158,10 +156,10 @@ class Client:
 
         message = self._recv_data()
         if message["header"] == TP4_utils.message_header.ERROR:
-            print("\nErreur lors de la récupération des courriels.\n")
+            print(message["data"])
             return
-        for courriel in message["data"]:
-            print(TP4_utils.EMAIL_DISPLAY.format(**courriel))
+
+        print("\n" + TP4_utils.EMAIL_DISPLAY.format(**message["data"]))
 
     def _sending(self) -> None:
         """
