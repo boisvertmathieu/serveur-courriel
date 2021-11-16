@@ -284,21 +284,23 @@ class Server:
         # On vérifie si l'adresse source correspond à un utilisateur valide
         username_source = adresse_source.split("@")[0]
         if not os.path.isdir(self._server_data_path + username_source):
-            raise Exception(
-                "Aucun utilisateur existant n'est associé à l'adresse source.")
+            return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data="L'adresse source n'existe pas")
 
+        message = TP4_utils.GLO_message(
+            header=TP4_utils.message_header.OK, data="Le courriel a été envoyé avec succès.")
         # Si l'adresse courriel de destination est une adresse ulaval
         if adresse_destination.split("@")[1] == "ulaval.ca":
             username_destination = adresse_destination.split("@")[0]
             dir_path = self._server_data_path + username_destination
-            throw_ex = False
 
             # Si l'utilisateur correspondant à l'adresse de destination est un utilisateur invalide
             if not os.path.isdir(self._server_data_path + username_destination):
-                throw_ex = True
                 dir_path = self._server_lost_dir + username_destination
                 if not os.path.isdir(dir_path):
                     os.mkdir(dir_path)
+
+                message = TP4_utils.GLO_message(
+                    header=TP4_utils.message_header.ERROR, data="L'adresse de destination n'existe pas")
 
             number_of_file_in_dir = len(
                 [name for name in os.listdir(dir_path) if os.path.isfile(name)])
@@ -308,25 +310,25 @@ class Server:
             file.write(email_string)
             file.close()
 
-            # Si l'utilisateur de destination était un utilisateur invalide, on retourne un message d'erreur
-            if throw_ex:
-                raise Exception("Adresse courriel de destinataire invalide.")
-        else:
-            # On essaie de se connecter au serveur smtp distant pour envoyer le courriel
-            destination_domain = adresse_destination.split("@")[1]
-            smtp_server = "smtp." + destination_domain
+            return message
 
-            try:
-                with smtplib.SMTP(smtp_server, timeout=10) as server:
-                    message = email.message_from_string(email_string)
-                    server.send_message(message)
-            except smtplib.smtplib.SMTPException:
-                raise Exception("Le message n'a pas pu être envoyé")
-            except socket.timeout:
-                raise Exception(
-                    "La connexion au serveur SMTP n'a pas pu être établis")
+        # On essaie de se connecter au serveur smtp distant pour envoyer le courriel
+        destination_domain = adresse_destination.split("@")[1]
+        smtp_server = "smtp." + destination_domain
+        try:
+            with smtplib.SMTP(smtp_server, timeout=10) as server:
+                message = email.message_from_string(email_string)
+                server.send_message(message)
+                return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data="Le courriel a été envoyé avec succès.")
+        except smtplib.smtplib.SMTPException:
+            return TP4_utils.GLO_message(
+                header=TP4_utils.message_header.ERROR, data="Le message n'a pas pu être envoyé")
+        except socket.timeout:
+            return TP4_utils.GLO_message(
+                header=TP4_utils.message_header.ERROR, data="La connexion au serveur SMTP n'a pas pu être établis")
 
-    def _get_stats(self, username: str) -> TP4_utils.GLO_message:
+
+   def _get_stats(self, username: str) -> TP4_utils.GLO_message:
         """
         Cette méthode récupère les statistiques liées à un utilisateur.
 
@@ -336,7 +338,18 @@ class Server:
         Si le nom d’utilisateur est invalide, le GLO_message retourné
         indique l’erreur au client.
         """
-        # TODO
+
+        # Compte le nombre de fichiers dans le dossier de l'utilisateur
+        nombre_de_fichier = len([name for name in os.listdir(
+            self._server_data_path + username) if os.path.isfile(name)])
+
+        # Compte la taille du dossier de l'utilisateur
+        taille_du_dossier = sum(
+            os.path.getsize(self._server_data_path + username + "/" + name) for name in os.listdir(
+                self._server_data_path + username) if os.path.isfile(name))
+
+        return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data="count {}\nfolder_size {}".format(
+            nombre_de_fichier, taille_du_dossier))
 
     def run(self) -> NoReturn:
         """
