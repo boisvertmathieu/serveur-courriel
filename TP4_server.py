@@ -197,7 +197,7 @@ class Server:
             return
 
         header = message["header"]
-        glo_msg = None
+        glo_msg = {}
         try:
             if header is TP4_utils.message_header.INBOX_READING_REQUEST:
                 glo_msg = self._get_subject_list(message["data"]["username"])
@@ -207,14 +207,14 @@ class Server:
                 glo_msg = self._send_email(message["data"])
             elif header is TP4_utils.message_header.STATS_REQUEST:
                 glo_msg = self._get_stats(message["data"]["username"])
+
+            glosocket.send_msg(client_socket, json.dumps({
+                "header": glo_msg["header"],
+                "data": glo_msg["data"]
+            }))
         except Exception as ex:
             glo_msg["header"] = TP4_utils.message_header.ERROR
             glo_msg["data"] = ex
-
-        glosocket.send_msg(client_socket, json.dumps({
-            "header": glo_msg["header"],
-            "data": glo_msg["data"]
-        }))
 
     def _get_subject_list(self, username: str) -> TP4_utils.GLO_message:
         """
@@ -239,9 +239,8 @@ class Server:
                         source = content.split('\\n')[0].split(' ')[1]
                         subjects.append(TP4_utils.SUBJECT_DISPLAY.format(number=number, subject=subject, source=source))
             return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data={"subjects": subjects})
-
         else:
-            return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data=None)
+            return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data={})
 
     def _get_email(self, data: dict) -> TP4_utils.GLO_message:
         """
@@ -319,11 +318,10 @@ class Server:
 
             number_of_file_in_dir = len(
                 [name for name in os.listdir(dir_path) if os.path.isfile(name)])
-            filename = str(number_of_file_in_dir + 1) + username_destination
+            filename = str(number_of_file_in_dir + 1) + '-' + username_destination
 
-            file = open(dir_path + "/" + filename, "w")
-            file.write(email_string)
-            file.close()
+            with open(os.path.join(dir_path, filename), "w") as f:
+                f.write(email_string)
 
             return message
 
@@ -353,9 +351,9 @@ class Server:
         """
         Cette méthode récupère les statistiques liées à un utilisateur.
 
-        Le GLO_message retourné contient dans le champ « data » les entrées :
-        - « count », avec le nombre de courriels,
-        - « folder_size », avec la taille totale du dossier en octets.
+        Le GLO_message retourné contient dans le champ «data» les entrées:
+        - «count», avec le nombre de courriels,
+        - «folder_size», avec la taille totale du dossier en octets.
         Si le nom d’utilisateur est invalide, le GLO_message retourné
         indique l’erreur au client.
         """

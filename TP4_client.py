@@ -156,7 +156,7 @@ class Client:
 
         message = self._recv_data()
         if message["header"] == TP4_utils.message_header.ERROR:
-            print(message["data"])
+            print("\n" + message["data"])
             return
 
         print("\n" + TP4_utils.EMAIL_DISPLAY.format(**message["data"]))
@@ -177,12 +177,13 @@ class Client:
         Note: un utilisateur termine la saisie avec un point sur une
         ligne
         """
-        destinataire = input("Adresse du destinataire: ")
-        sujet = input("Sujet du message: ")
-        print("Contenu du courriel: (enrez '.' sur une ligne seule afin de terminer l'écriture)")
+        destinataire:str = input("Adresse du destinataire: ")
+        sujet: str = input("Sujet du message: ")
+
+        print("\n*** Contenu du courriel: (enrez '.' sur une ligne seule afin de terminer l'écriture) ***")
         corps = ""
         buffer = ""
-        while buffer != ".":
+        while buffer != ".\n":
             corps += buffer
             buffer = input("") + '\n'
 
