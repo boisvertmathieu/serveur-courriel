@@ -43,14 +43,18 @@ class Client:
         valide, qui est décodé avec le module json. Si le JSON est invalide
         ou le résultat est None, le programme termine avec un code-1.
         """
-        data = json.loads(glosocket.recv_msg(self.socket_client))
-        if data["header"] == TP4_utils.message_header.OK and data["data"] is not None:
-            return TP4_utils.GLO_message(
-                header=data["header"],
-                data=data["data"]
-            )
+        message = glosocket.recv_msg(self.socket_client)
+        try:
+            message = json.loads(message)
+            if message["header"] is None or message["data"] is None:
+                raise json.JSONDecodeError
+        except (json.JSONDecodeError, TypeError):
+            exit(-1)
 
-        exit(-1)
+        return TP4_utils.GLO_message(
+            header=TP4_utils.message_header(message["header"]),
+            data=message["data"]
+        )
 
     def _authentication(self) -> None:
         """
@@ -80,14 +84,13 @@ class Client:
                 }))
 
                 message = self._recv_data()
-                if message["header"] == TP4_utils.message_header.OK:
-                    self._logged_in = True
-                    self._username = username
+                if message["header"] == TP4_utils.message_header.ERROR:
+                    print(message["data"])
                     return
 
-                # On affiche l'erreur si le serveur n'a pas répondu avec "ok"
-                print(message["data"])
-
+                self._logged_in = True
+                self._username = username
+                return
             else:
                 print("\nSélection invalide.\n")
 

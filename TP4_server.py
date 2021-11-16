@@ -59,9 +59,9 @@ class Server:
         message = glosocket.recv_msg(source)
         try:
             message = json.loads(message)
-            if not isinstance(message, TP4_utils.GLO_message):
+            if message["header"] is None or message["data"] is None:
                 raise json.JSONDecodeError
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, TypeError):
             # Le json est invalide ou est none
             source.close()
             self._connected_client_list.remove(source)
@@ -71,7 +71,7 @@ class Server:
 
         # Si on arrive ici, c'est que le json est valide et représente un GLO_message
         return TP4_utils.GLO_message(
-            header=message["header"],
+            header=TP4_utils.message_header(message["header"]),
             data=message["data"]
         )
 
@@ -88,16 +88,13 @@ class Server:
         )
 
         for client in waiting_list:
-            if client == self._server_socket:
-                self._accept_client()
+            self._accept_client()
+            connected_client = self._connected_client_list[-1]
 
-            connected_client: socket = self._connected_client_list[-1]
-            message = self._recv_data(connected_client)
-            if (message["header"] == TP4_utils.message_header.AUTH_LOGIN or
-                    message["header"] == TP4_utils.message_header.AUTH_REGISTER):
+            if client == self._server_socket:
                 self._authenticate_client(connected_client)
-            else:
-                self._process_client(connected_client)
+
+            self._process_client(connected_client)
 
     def _accept_client(self) -> None:
         """
@@ -120,65 +117,61 @@ class Server:
         est également ajouté aux listes appropriées.
         """
         message = self._recv_data(client_socket)
-        username = message["data"]["password"]
-        password = message["data"]["username"]
+        username = message["data"]["username"]
+        password = message["data"]["password"]
         header = message["header"]
 
         user_datafile_path = self._server_data_path + username
         # Connexion
         if header == TP4_utils.message_header.AUTH_LOGIN:
-            # On valide si un fichier correspondant au username existe
-            if not os.path.isfile(user_datafile_path):
+            # Si le dossier correspondant au username n'existe pas, on retourne une erreur
+            if not os.path.isdir(user_datafile_path):
                 # Envoyer message erreur au client
                 glosocket.send_msg(client_socket, json.dumps({
                     "header": TP4_utils.message_header.ERROR,
-                    "data": {
-                        "message": "Nom d'utilisateur incorrect."
-                    }
+                    "data": "Nom d'utilisateur incorrect."
+                }))
+
+            file = open(user_datafile_path + "/passwd", "r")
+            content = file.read().replace('\n', '')
+            if hashlib.sha384(password.encode()).hexdigest() != content:
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": "Mot de passe incorrect."
                 }))
             else:
-                file = open(user_datafile_path + "/passwd", "r")
-                content = file.read().replace('\n', '')
-                if hashlib.sha384(password.encode()).hexdigest() != content:
-                    glosocket.send_msg(client_socket, json.dumps({
-                        "header": TP4_utils.message_header.ERROR,
-                        "data": {
-                            "message": "Mot de passe incorrect."
-                        }
-                    }))
-                else:
-                    glosocket.send_msg(client_socket, json.dumps({
-                        "header": TP4_utils.message_header.OK,
-                        "data": {}
-                    }))
-
-                file.close()
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.OK,
+                    "data": {}
+                }))
+            return
 
         # Création d'un compte
-        elif header == TP4_utils.message_header.AUTH_REGISTER:
-            # On valide si le username est déjà prit
-            if os.path.isdir(user_datafile_path):
-                glosocket.send_msg(client_socket, TP4_utils.GLO_message(
-                    header=TP4_utils.message_header.ERROR,
-                    data={"message": "Le nom d'utilisateur est déjà prit."}
-                ))
-            # Valider sur le username et password sont invalide
-            elif re.search(r"^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])([a-zA-Z0-9]+){9,}$", password) is None:
-                glosocket.send_msg(client_socket, TP4_utils.GLO_message(
-                    header=TP4_utils.message_header.ERROR,
-                    data={
-                        "message": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."}
-                ))
-            else:
-                # Créer un fichier nommé 'passwd' dans user_datafile_path et encrypter le password dans le fichier
-                file = open(user_datafile_path + "/passwd", "w")
-                file.write(hashlib.sha384(password.encode()).hexdigest())
-                file.close()
+        # On valide si le username est déjà prit
+        if os.path.isdir(user_datafile_path):
+            glosocket.send_msg(client_socket, json.dumps({
+                "header": TP4_utils.message_header.ERROR,
+                "data": "Le nom d'utilisateur est déjà prit."
+            }))
+        # Valider sur le username et password sont invalide
+        elif re.search(r"^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])([a-zA-Z0-9]+){9,}$", password) is None:
+            glosocket.send_msg(client_socket, json.dumps({
+                "header": TP4_utils.message_header.ERROR,
+                "data": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."
+            }))
+        else:
+            # Créer un fichier nommé 'passwd' dans user_datafile_path et encrypter le password dans le fichier
+            if not os.path.isdir(user_datafile_path):
+                os.mkdir(user_datafile_path)
 
-                glosocket.send_msg(client_socket, TP4_utils.GLO_message(
-                    header=TP4_utils.message_header.OK,
-                    data={}
-                ))
+            with open(user_datafile_path + "/passwd", "w") as file:
+                file.write(hashlib.sha384(password.encode()).hexdigest())
+
+            glosocket.send_msg(client_socket, json.dumps({
+                "header": TP4_utils.message_header.OK,
+                "data": {}
+            }))
+        return
 
     def _process_client(self, client_socket: socket.socket) -> None:
         """
@@ -188,18 +181,18 @@ class Server:
         Sinon, la méthode traite la requête et répond au client avec un JSON
         conformant à la classe d’annotation GLO_message.
         """
-        message = glosocket.recv_msg(client_socket)
-        if (message is not None):
+        message = self._recv_data(client_socket)
+        if message is not None:
             action = message["header"]
             try:
-                if (action is TP4_utils.message_header.INBOX_READING_REQUEST):
+                if action is TP4_utils.message_header.INBOX_READING_REQUEST:
                     username = message["data"]["username"]
                     self._get_subject_list(username)
-                elif (action is TP4_utils.message_header.INBOX_READING_CHOICE):
+                elif action is TP4_utils.message_header.INBOX_READING_CHOICE:
                     self._get_email(message["data"])
-                elif (action is TP4_utils.message_header.EMAIL_SENDING):
+                elif action is TP4_utils.message_header.EMAIL_SENDING:
                     self._send_email(message["data"])
-                elif (action is TP4_utils.message_header.STATS_REQUEST):
+                elif action is TP4_utils.message_header.STATS_REQUEST:
                     username = message["data"]["username"]
                     self._get_stats(username)
             except Exception as ex:
