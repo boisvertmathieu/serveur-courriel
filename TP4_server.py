@@ -23,7 +23,7 @@ class Server:
         - Préparer deux listes vides pour les sockets clients.
         - Compiler un pattern Regex qui sera utilisé pour vérifier les adresses courriel.
 
-        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests.
+        Attention: ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests.
         Vous pouvez cependant ajouter des attributs supplémentaires.
         """
         self._client_socket_list: list[socket.socket] = []
@@ -32,7 +32,7 @@ class Server:
 
         socket_serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         socket_serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        socket_serveur.bind(("localhost", TP4_utils.SOCKET_PORT))
+        socket_serveur.bind(("127.0.0.1", TP4_utils.SOCKET_PORT))
         socket_serveur.listen(5)
         self._server_socket = socket_serveur
 
@@ -57,22 +57,23 @@ class Server:
         le résultat est None, le socket client est fermé et retiré des listes.
         """
         message = glosocket.recv_msg(source)
-        if message is None:
+        try:
+            message = json.loads(message)
+            if not isinstance(message, TP4_utils.GLO_message):
+                raise json.JSONDecodeError
+        except json.JSONDecodeError:
+            # Le json est invalide ou est none
             source.close()
             self._connected_client_list.remove(source)
             self._client_socket_list.remove(source)
             self._client_count -= 1
-        else:
-            try:
-                # TODO : Valider si data est de type GLO_message
-                json_data = json.loads(message)
-                data = TP4_utils.GLO_message(header=json_data["header"], data={
-                                             "username": json_data["username"], "password": json_data["password"]})
+            return
 
-                # Retourner les données contenu dans data sous forme de GLO_message
-                return data
-            except json.JSONDecodeError:
-                return
+        # Si on arrive ici, c'est que le json est valide et représente un GLO_message
+        return TP4_utils.GLO_message(
+            header=message["header"],
+            data=message["data"]
+        )
 
     def _main_loop(self) -> None:
         """
@@ -88,24 +89,26 @@ class Server:
 
         for client in waiting_list:
             if client == self._server_socket:
-                self._authenticate_client(client)
+                self._accept_client()
+
+            connected_client: socket = self._connected_client_list[-1]
+            message = self._recv_data(connected_client)
+            if (message["header"] == TP4_utils.message_header.AUTH_LOGIN or
+                    message["header"] == TP4_utils.message_header.AUTH_REGISTER):
+                self._authenticate_client(connected_client)
             else:
-                self._process_client(client)
+                self._process_client(connected_client)
 
     def _accept_client(self) -> None:
         """
         Cette méthode accepte une connexion avec un nouveau socket client et
         l’ajoute aux listes appropriées.
         """
-        # On traite le nouveau client
         client, _ = self._server_socket.accept()
         self._client_socket_list.append(client)
         self._connected_client_list.append(client)
         self._client_count += 1
         print(f"Nouveau client connecté : {self._client_count}")
-
-        glosocket.send_msg(client, "Bonjour")
-        return
 
     def _authenticate_client(self, client_socket: socket.socket) -> None:
         """
@@ -116,10 +119,10 @@ class Server:
         conformant à la classe d’annotation GLO_message. Si nécessaire, le client
         est également ajouté aux listes appropriées.
         """
-        data = self._recv_data(client_socket)
-        username = data["data"]["password"]
-        password = data["data"]["username"]
-        header = data["header"]
+        message = self._recv_data(client_socket)
+        username = message["data"]["password"]
+        password = message["data"]["username"]
+        header = message["header"]
 
         user_datafile_path = self._server_data_path + username
         # Connexion
@@ -145,7 +148,8 @@ class Server:
                     }))
                 else:
                     glosocket.send_msg(client_socket, json.dumps({
-                        "header": TP4_utils.message_header.OK, "data": {}
+                        "header": TP4_utils.message_header.OK,
+                        "data": {}
                     }))
 
                 file.close()
@@ -154,29 +158,27 @@ class Server:
         elif header == TP4_utils.message_header.AUTH_REGISTER:
             # On valide si le username est déjà prit
             if os.path.isdir(user_datafile_path):
-                glosocket.send_msg(client_socket, json.dumps({
-                    "header": TP4_utils.message_header.ERROR,
-                    "data": {
-                        "message": "Le nom d'utilisateur est déjà prit."
-                    }}))
+                glosocket.send_msg(client_socket, TP4_utils.GLO_message(
+                    header=TP4_utils.message_header.ERROR,
+                    data={"message": "Le nom d'utilisateur est déjà prit."}
+                ))
             # Valider sur le username et password sont invalide
             elif re.search(r"^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])([a-zA-Z0-9]+){9,}$", password) is None:
-                glosocket.send_msg(client_socket, json.dumps({
-                    "header": TP4_utils.message_header.ERROR,
-                    "data": {
-                        "message": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."
-                    }
-                }))
+                glosocket.send_msg(client_socket, TP4_utils.GLO_message(
+                    header=TP4_utils.message_header.ERROR,
+                    data={
+                        "message": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."}
+                ))
             else:
                 # Créer un fichier nommé 'passwd' dans user_datafile_path et encrypter le password dans le fichier
                 file = open(user_datafile_path + "/passwd", "w")
                 file.write(hashlib.sha384(password.encode()).hexdigest())
                 file.close()
 
-                glosocket.send_msg(client_socket, json.dumps({
-                    "header": TP4_utils.message_header.OK,
-                    "data": {}
-                }))
+                glosocket.send_msg(client_socket, TP4_utils.GLO_message(
+                    header=TP4_utils.message_header.OK,
+                    data={}
+                ))
 
     def _process_client(self, client_socket: socket.socket) -> None:
         """
@@ -187,17 +189,17 @@ class Server:
         conformant à la classe d’annotation GLO_message.
         """
         message = glosocket.recv_msg(client_socket)
-        if(message is not None):
+        if (message is not None):
             action = message["header"]
             try:
-                if(action is TP4_utils.message_header.INBOX_READING_REQUEST):
+                if (action is TP4_utils.message_header.INBOX_READING_REQUEST):
                     username = message["data"]["username"]
                     self._get_subject_list(username)
-                elif(action is TP4_utils.message_header.INBOX_READING_CHOICE):
+                elif (action is TP4_utils.message_header.INBOX_READING_CHOICE):
                     self._get_email(message["data"])
-                elif(action is TP4_utils.message_header.EMAIL_SENDING):
+                elif (action is TP4_utils.message_header.EMAIL_SENDING):
                     self._send_email(message["data"])
-                elif(action is TP4_utils.message_header.STATS_REQUEST):
+                elif (action is TP4_utils.message_header.STATS_REQUEST):
                     username = message["data"]["username"]
                     self._get_stats(username)
             except Exception as ex:
@@ -216,7 +218,7 @@ class Server:
         indique l’erreur au client.
         """
         usernameExists = os.path.isdir("./server_data/{username}")
-        if(usernameExists):
+        if (usernameExists):
             emails = os.listdir("./server_data/{username}")
             retour: dict
             for email in emails:
@@ -242,10 +244,10 @@ class Server:
         if(usernameExists):
         """
         usernameExists = os.path.isdir("./server_data/{username}")
-        if(usernameExists):
+        if (usernameExists):
 
             emailExists = os.path.isfile("./server_data/{username}/" + data)
-            if(emailExists):
+            if (emailExists):
                 with open("./server_data/{username}/{email}") as file:
                     """utiliser os pour prendre les infos du email"""
                     number = ""

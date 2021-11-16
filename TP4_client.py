@@ -41,17 +41,16 @@ class Client:
 
         Le message attendu est une chaine de caractère représentant un GLO_message
         valide, qui est décodé avec le module json. Si le JSON est invalide
-        ou le résultat est None, le programme termine avec un code -1.
+        ou le résultat est None, le programme termine avec un code-1.
         """
-        answer = json.loads(glosocket.recv_msg(self._socket))
-        if answer.get("header") == TP4_utils.message_header.OK and answer.get("data") is not None:
-            ret = TP4_utils.GLO_message(
-                header=answer["header"],
-                data=answer["data"]
+        data = json.loads(glosocket.recv_msg(self.socket_client))
+        if data["header"] == TP4_utils.message_header.OK and data["data"] is not None:
+            return TP4_utils.GLO_message(
+                header=data["header"],
+                data=data["data"]
             )
-        else:
-            ret = -1
-        return ret
+
+        exit(-1)
 
     def _authentication(self) -> None:
         """
@@ -69,19 +68,19 @@ class Client:
             if re.search(r"^1|2$", choix) is not None:
                 # Connexion ou création de l'utilisateur
                 username: str = input("\nEntrez votre nom d'utilisateur: ")
-                password: str = input("Entrez votre mot de passe: ")
+                password = getpass.getpass("Entrez votre mot de passe: ")
 
-                header = TP4_utils.message_header.AUTH_LOGIN
+                header = TP4_utils.message_header.AUTH_REGISTER
                 if choix == "2":
-                    header = TP4_utils.message_header.AUTH_REGISTER
+                    header = TP4_utils.message_header.AUTH_LOGIN
 
-                glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
-                    header=header,
-                    data={"username": username, "password": password}
-                ))
+                glosocket.send_msg(self.socket_client, json.dumps({
+                    "header": header,
+                    "data": {"username": username, "password": password}
+                }))
 
                 message = self._recv_data()
-                if(message["header"] == TP4_utils.message_header.OK):
+                if message["header"] == TP4_utils.message_header.OK:
                     self._logged_in = True
                     self._username = username
                     return
@@ -129,9 +128,9 @@ class Client:
         - Récupère le courriel choisi depuis le serveur.
         - Affiche le courriel dans le terminal avec le gabarit EMAIL_DISPLAY.
         """
-        glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
-            header=TP4_utils.message_header.EMAIL_REQUEST,
-        ))
+        glosocket.send_msg(self.socket_client, json.dumps({
+            "header": TP4_utils.message_header.EMAIL_REQUEST
+        }))
 
     def _sending(self) -> None:
         """
@@ -148,8 +147,8 @@ class Client:
         Note : un utilisateur termine la saisie avec un point sur une
         ligne
         """
-        destinataire: string = input("Adresse du destinataire: ")
-        sujet: string = input("Sujet du message: ")
+        destinataire = input("Adresse du destinataire: ")
+        sujet = input("Sujet du message: ")
         corps = ""
         buffer = ""
         while buffer != ".":
@@ -162,10 +161,10 @@ class Client:
         message["Subject"] = sujet
         message.set_content(corps)
 
-        glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
-            header=TP4_utils.message_header.EMAIL_SENDING,
-            data=message.as_string()
-        ))
+        glosocket.send_msg(self.socket_client, json.dumps({
+            "header": TP4_utils.message_header.EMAIL_SENDING,
+            "data": message.as_string()
+        }))
 
         # TODO : Valider si le serveur repond avec une erreur, si oui, on affiche l'erreur avant la fin de la fonction
 
@@ -180,12 +179,12 @@ class Client:
             STATS_DISPLAY.
         """
 
-        glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
-            header=TP4_utils.message_header.STATS_REQUEST,
-        ))
+        glosocket.send_msg(self.socket_client, json.dumps({
+            "header": TP4_utils.message_header.STATS_REQUEST,
+        }))
 
         message = self._recv_data()
-        if(message["header"] == TP4_utils.message_header.ERROR):
+        if (message["header"] == TP4_utils.message_header.ERROR):
             print(message["data"])
             return
 
