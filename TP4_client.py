@@ -161,7 +161,17 @@ class Client:
         - Affiche les statistiques dans le terminal avec le gabarit
             STATS_DISPLAY.
         """
-        # TODO
+
+        glosocket.send_msg(self.socket_client, json.dumps({
+            "header": TP4_utils.message_header.STATS_REQUEST
+        }))
+
+        message = self._recv_data()
+        if(message["header"] == TP4_utils.message_header.ERROR):
+            print(message["data"])
+            return
+
+        print(TP4_utils.STATS_DISPLAY.format(**message["data"]))
 
     def run(self) -> NoReturn:
         """
