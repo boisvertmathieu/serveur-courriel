@@ -71,7 +71,23 @@ class Client:
                 username: str = input("\nEntrez votre nom d'utilisateur: ")
                 password: str = input("Entrez votre mot de passe: ")
 
-                self.socket_client.send((username, password).encode("utf8"))
+                header = TP4_utils.message_header.AUTH_LOGIN
+                if choix == "2":
+                    header = TP4_utils.message_header.AUTH_REGISTER
+
+                glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
+                    header=header,
+                    data={"username": username, "password": password}
+                ))
+
+                message = self._recv_data()
+                if(message["header"] == TP4_utils.message_header.OK):
+                    self._logged_in = True
+                    self._username = username
+                    return
+
+                # On affiche l'erreur si le serveur n'a pas répondu avec "ok"
+                print(message["data"])
 
             else:
                 print("\nSélection invalide.\n")
@@ -113,7 +129,9 @@ class Client:
         - Récupère le courriel choisi depuis le serveur.
         - Affiche le courriel dans le terminal avec le gabarit EMAIL_DISPLAY.
         """
-        # TODO
+        glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
+            header=TP4_utils.message_header.EMAIL_REQUEST,
+        ))
 
     def _sending(self) -> None:
         """
@@ -144,10 +162,10 @@ class Client:
         message["Subject"] = sujet
         message.set_content(corps)
 
-        glosocket.send_msg(self.socket_client, json.dumps({
-            "header": TP4_utils.message_header.EMAIL_SENDING,
-            "data": message.as_string()
-        }))
+        glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
+            header=TP4_utils.message_header.EMAIL_SENDING,
+            data=message.as_string()
+        ))
 
         # TODO : Valider si le serveur repond avec une erreur, si oui, on affiche l'erreur avant la fin de la fonction
 
@@ -162,9 +180,9 @@ class Client:
             STATS_DISPLAY.
         """
 
-        glosocket.send_msg(self.socket_client, json.dumps({
-            "header": TP4_utils.message_header.STATS_REQUEST
-        }))
+        glosocket.send_msg(self.socket_client, TP4_utils.GLO_message(
+            header=TP4_utils.message_header.STATS_REQUEST,
+        ))
 
         message = self._recv_data()
         if(message["header"] == TP4_utils.message_header.ERROR):
