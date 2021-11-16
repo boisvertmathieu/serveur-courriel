@@ -16,14 +16,14 @@ class Client:
     def __init__(self, destination: str) -> None:
         """
         Cette méthode est automatiquement appelée à l’instanciation du client,
-        elle doit :
+        elle doit:
         - Initialiser le socket du client et le connecter à l’adresse en paramètre.
-        - Préparer un attribut « _logged_in » pour garder en mémoire l’état de
+        - Préparer un attribut «_logged_in» pour garder en mémoire l’état de
             l’authentification avec le serveur.
-        - Préparer un attribut « _username » pour garder en mémoire le nom
+        - Préparer un attribut «_username» pour garder en mémoire le nom
             d’utilisateur utilisé pour l’authentification.
 
-        Attention : ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests.
+        Attention: ne changez pas le nom des attributs fournis, ils sont utilisés dans les tests.
         Vous pouvez cependant ajouter des attributs supplémentaires.
         """
         self._logged_in = False
@@ -60,7 +60,7 @@ class Client:
         """
         Cette fonction traite l’authentification du client.
 
-        La fonction, dans l’ordre :
+        La fonction, dans l’ordre:
         - Demande au client s’il souhaite se connecter ou créer un compte
         - Demande le nom d’utilisateur
         - Demande le mot de passe
@@ -99,30 +99,27 @@ class Client:
 
         La fonction affiche le menu principal à l’utilisateur, récupère son
         choix et appelle l’une des fonctions _reading, _sending ou _get_stats
-        ou quitte avec un code 0.
+        ou quitte avec un code0.
         """
-        print(TP4_utils.CLIENT_USE_CHOICE)
-        choice = {
-            1: self._reading,
-            2: self._sending,
-            3: self._get_stats,
-            4: "quit"
-        }
-        option = 0
-        while option not in {1, 2, 3, 4}:
-            option = int(input("Choisissez une option : "))
-        # Quitte avec code 0
-        if option == 4:
-            return 0
-        # Appelle la bonne fonction selon le choix
-        else:
-            choice[option]()
+        while True:
+            choix: str = input("\n" + TP4_utils.CLIENT_USE_CHOICE + "\n")
+            if re.search(r"^1|2|3|4$", choix) is not None:
+                if choix == "1":
+                    self._reading()
+                elif choix == "2":
+                    self._sending()
+                elif choix == "3":
+                    self._get_stats()
+                elif choix == "4":
+                    exit(0)
+            else:
+                print("\nSélection invalide.\n")
 
     def _reading(self) -> None:
         """
         Cette fonction traite les requêtes de consultation de courriel.
 
-        La fonction, dans l’ordre :
+        La fonction, dans l’ordre:
         - Envoie une requête au serveur de consultation de courriel.
         - Récupère la liste des sujets depuis le serveur.
         - Demande à l’utilisateur quel courriel consulter.
@@ -131,14 +128,46 @@ class Client:
         - Affiche le courriel dans le terminal avec le gabarit EMAIL_DISPLAY.
         """
         glosocket.send_msg(self.socket_client, json.dumps({
-            "header": TP4_utils.message_header.EMAIL_REQUEST
+            "header": TP4_utils.message_header.INBOX_READING_REQUEST,
+            "data": {"username": self._username}
         }))
+
+        message = self._recv_data()
+        if message["header"] == TP4_utils.message_header.ERROR:
+            print("\nErreur lors de la récupération des courriels.\n")
+            return
+
+        if not len(message["data"]["subjects"]):
+            print("\nIl y a aucun courriels.\n")
+            return
+
+        print("\nListe des sujets: ")
+        for subject in message["data"]["subjects"]:
+            print(subject)
+        print("\n(Si plusieurs numéros, séparez ceux-ci par une virgule. Ex: 1,2,3,4)")
+        choix: str = input("Entrez les numéros de courriel que vous souhaitez consulter: ")
+
+        if re.search(r"^[0-9]+(,[0-9]+)*$", choix) is None:
+            print("\nErreur lors du choix des courriels disponibles.\n")
+            return
+
+        glosocket.send_msg(self.socket_client, json.dumps({
+            "header": TP4_utils.message_header.INBOX_READING_CHOICE,
+            "data": {"username": self._username, "choice": choix}
+        }))
+
+        message = self._recv_data()
+        if message["header"] == TP4_utils.message_header.ERROR:
+            print("\nErreur lors de la récupération des courriels.\n")
+            return
+        for courriel in message["data"]:
+            print(TP4_utils.EMAIL_DISPLAY.format(**courriel))
 
     def _sending(self) -> None:
         """
         Cette fonction traite les requêtes d’envoi de courriel.
 
-        Cette fonction, dans l’ordre :
+        Cette fonction, dans l’ordre:
         - Demande l’adresse email de destination
         - Demande le sujet
         - Demande le contenu du message.
@@ -146,7 +175,7 @@ class Client:
         - Envoie l’objet sous forme de chaine de caractère au serveur
         - Récupère la réponse du serveur, affiche l’erreur si nécessaire
 
-        Note : un utilisateur termine la saisie avec un point sur une
+        Note: un utilisateur termine la saisie avec un point sur une
         ligne
         """
         destinataire = input("Adresse du destinataire: ")
@@ -174,7 +203,7 @@ class Client:
         """
         Cette fonction traite les requêtes de demandes de statistiques.
 
-        Cette fonction, dans l’ordre :
+        Cette fonction, dans l’ordre:
         - Envoie une requête de statistique au serveur.
         - Récupère les statistiques depuis le serveur.
         - Affiche les statistiques dans le terminal avec le gabarit
@@ -186,7 +215,7 @@ class Client:
         }))
 
         message = self._recv_data()
-        if (message["header"] == TP4_utils.message_header.ERROR):
+        if message["header"] == TP4_utils.message_header.ERROR:
             print(message["data"])
             return
 

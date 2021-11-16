@@ -60,7 +60,7 @@ class Server:
         message = glosocket.recv_msg(source)
         try:
             message = json.loads(message)
-            if message["header"] is None or message["data"] is None:
+            if "header" not in message or "data" not in message:
                 raise json.JSONDecodeError
         except (json.JSONDecodeError, TypeError):
             # Le json est invalide ou est none
@@ -84,19 +84,19 @@ class Server:
         attente puis appelle l’une des méthodes _accept_client, _process_client
         ou _authenticate_client pour chacun d’entre eux.
         """
-        waiting_list, _, _ = select.select(
-            [self._server_socket] + self._client_socket_list, [], []
-        )
+        while True:
+            waiting_list, _, _ = select.select(
+                [self._server_socket] + self._client_socket_list, [], []
+            )
 
-        for client in waiting_list:
-            if client == self._server_socket:
-                self._accept_client()
-            else:
-                self.message = self._recv_data(client)
-                if self.message["header"] == TP4_utils.message_header.AUTH_REGISTER or \
-                        self.message["header"] == TP4_utils.message_header.AUTH_LOGIN:
-                    self._authenticate_client(client)
+            for client in waiting_list:
+                if client == self._server_socket:
+                    self._accept_client()
                 else:
+                    self.message = self._recv_data(client)
+                    if self.message["header"] == TP4_utils.message_header.AUTH_REGISTER or \
+                            self.message["header"] == TP4_utils.message_header.AUTH_LOGIN:
+                        self._authenticate_client(client)
                     self._process_client(client)
 
     def _accept_client(self) -> None:
@@ -189,25 +189,38 @@ class Server:
         Sinon, la méthode traite la requête et répond au client avec un JSON
         conformant à la classe d’annotation GLO_message.
         """
-        message = self._recv_data(client_socket)
-        if message is not None:
-            action = message["header"]
-            try:
-                if action is TP4_utils.message_header.INBOX_READING_REQUEST:
-                    username = message["data"]["username"]
-                    self._get_subject_list(username)
-                elif action is TP4_utils.message_header.INBOX_READING_CHOICE:
-                    self._get_email(message["data"])
-                elif action is TP4_utils.message_header.EMAIL_SENDING:
-                    self._send_email(message["data"])
-                elif action is TP4_utils.message_header.STATS_REQUEST:
-                    username = message["data"]["username"]
-                    self._get_stats(username)
-            except Exception as ex:
+        message = self.message
+        if message is None:
+            self._connected_client_list.remove(client_socket)
+            self._client_socket_list.remove(client_socket)
+            self._client_count -= 1
+            return
+
+        action = message["header"]
+        try:
+            if action is TP4_utils.message_header.INBOX_READING_REQUEST:
+                username = message["data"]["username"]
+                glo_msg = self._get_subject_list(username)
                 glosocket.send_msg(client_socket, json.dumps({
-                    "header": TP4_utils.message_header.ERROR,
-                    "data": ex
+                    "header": glo_msg["header"],
+                    "data": glo_msg["data"]
                 }))
+            elif action is TP4_utils.message_header.INBOX_READING_CHOICE:
+                glo_msg = self._get_email(message["data"])
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": glo_msg["header"],
+                    "data": glo_msg["data"]
+                }))
+            elif action is TP4_utils.message_header.EMAIL_SENDING:
+                self._send_email(message["data"])
+            elif action is TP4_utils.message_header.STATS_REQUEST:
+                username = message["data"]["username"]
+                self._get_stats(username)
+        except Exception as ex:
+            glosocket.send_msg(client_socket, json.dumps({
+                "header": TP4_utils.message_header.ERROR,
+                "data": ex
+            }))
 
     def _get_subject_list(self, username: str) -> TP4_utils.GLO_message:
         """
@@ -218,19 +231,21 @@ class Server:
         Si le nom d’utilisateur est invalide, le GLO_message retourné
         indique l’erreur au client.
         """
-        usernameExists = os.path.isdir("./server_data/{username}")
-        if (usernameExists):
-            emails = os.listdir("./server_data/{username}")
-            retour: dict
-            for email in emails:
-                """utiliser os pour prendre les infos de chaque email"""
-                number = ""
-                subject = ""
-                source = ""
-                retour[number] = TP4_utils.SUBJECT_DISPLAY.format(
-                    number=number, subject=subject, source=source)
+        user_dir_path = self._server_data_path + username
+        if os.path.isdir(user_dir_path):
+            subjects = []
+            for file in os.listdir(user_dir_path):
+                # On valide si le fichier est du bon nom (si c'est un courriel)
+                if re.search("^[1-9]+-" + username + "$", file) is not None:
+                    with open(os.path.join(user_dir_path, file), "r") as f:
+                        content = f.read()
+                        # On récupère le sujet, le numéro et la source
+                        number = file.split('-')[0]
+                        subject = content.split('\\n')[2].split(' ')[1]
+                        source = content.split('\\n')[0].split(' ')[1]
+                        subjects.append(TP4_utils.SUBJECT_DISPLAY.format(number=number, subject=subject, source=source))
+            return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data=subjects)
 
-            return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data=retour)
         else:
             return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data=None)
 
@@ -238,17 +253,16 @@ class Server:
         """
         Cette méthode récupère le contenu du courriel choisi par l’utilisateur.
 
-        Le GLO_message retourné contient dans le champ « data » la représentation
+        Le GLO_message retourné contient dans le champ «data» la représentation
         en chaine de caractère du courriel chargé depuis le fichier à l’aide du
         module email. Si le choix ou le nom d’utilisateur est incorrect, le
         GLO_message retourné indique l’erreur au client.
         if(usernameExists):
         """
-        usernameExists = os.path.isdir("./server_data/{username}")
-        if (usernameExists):
 
-            emailExists = os.path.isfile("./server_data/{username}/" + data)
-            if (emailExists):
+        if os.path.isdir(self._server_data_path + "test"):
+            email_exists = os.path.isfile("./server_data/{username}/" + data)
+            if email_exists:
                 with open("./server_data/{username}/{email}") as file:
                     """utiliser os pour prendre les infos du email"""
                     number = ""
