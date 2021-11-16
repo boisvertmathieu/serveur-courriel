@@ -85,12 +85,11 @@ class Client:
 
                 message = self._recv_data()
                 if message["header"] == TP4_utils.message_header.ERROR:
-                    print(message["data"])
+                    print("\n" + message["data"] + "\n")
+                else:
+                    self._logged_in = True
+                    self._username = username
                     return
-
-                self._logged_in = True
-                self._username = username
-                return
             else:
                 print("\nSélection invalide.\n")
 

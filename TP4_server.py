@@ -45,6 +45,7 @@ class Server:
 
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@ulaval\.ca")
+        self.message = ""
 
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
@@ -88,13 +89,15 @@ class Server:
         )
 
         for client in waiting_list:
-            self._accept_client()
-            connected_client = self._connected_client_list[-1]
-
             if client == self._server_socket:
-                self._authenticate_client(connected_client)
-
-            self._process_client(connected_client)
+                self._accept_client()
+            else:
+                self.message = self._recv_data(client)
+                if self.message["header"] == TP4_utils.message_header.AUTH_REGISTER or \
+                        self.message["header"] == TP4_utils.message_header.AUTH_LOGIN:
+                    self._authenticate_client(client)
+                else:
+                    self._process_client(client)
 
     def _accept_client(self) -> None:
         """
@@ -103,7 +106,6 @@ class Server:
         """
         client, _ = self._server_socket.accept()
         self._client_socket_list.append(client)
-        self._connected_client_list.append(client)
         self._client_count += 1
         print(f"Nouveau client connecté : {self._client_count}")
 
@@ -116,7 +118,7 @@ class Server:
         conformant à la classe d’annotation GLO_message. Si nécessaire, le client
         est également ajouté aux listes appropriées.
         """
-        message = self._recv_data(client_socket)
+        message = self.message
         username = message["data"]["username"]
         password = message["data"]["password"]
         header = message["header"]
@@ -131,6 +133,7 @@ class Server:
                     "header": TP4_utils.message_header.ERROR,
                     "data": "Nom d'utilisateur incorrect."
                 }))
+                return
 
             file = open(user_datafile_path + "/passwd", "r")
             content = file.read().replace('\n', '')
@@ -139,27 +142,32 @@ class Server:
                     "header": TP4_utils.message_header.ERROR,
                     "data": "Mot de passe incorrect."
                 }))
-            else:
-                glosocket.send_msg(client_socket, json.dumps({
-                    "header": TP4_utils.message_header.OK,
-                    "data": {}
-                }))
-            return
+                return
+
+            glosocket.send_msg(client_socket, json.dumps({
+                "header": TP4_utils.message_header.OK,
+                "data": {}
+            }))
+            self._connected_client_list.append(client_socket)
 
         # Création d'un compte
-        # On valide si le username est déjà prit
-        if os.path.isdir(user_datafile_path):
-            glosocket.send_msg(client_socket, json.dumps({
-                "header": TP4_utils.message_header.ERROR,
-                "data": "Le nom d'utilisateur est déjà prit."
-            }))
-        # Valider sur le username et password sont invalide
-        elif re.search(r"^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])([a-zA-Z0-9]+){9,}$", password) is None:
-            glosocket.send_msg(client_socket, json.dumps({
-                "header": TP4_utils.message_header.ERROR,
-                "data": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."
-            }))
-        else:
+        if header == TP4_utils.message_header.AUTH_REGISTER:
+            # On valide si le username est déjà prit
+            if os.path.isdir(user_datafile_path):
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": "Le nom d'utilisateur est déjà prit."
+                }))
+                return
+
+            # Valider sur le username et password sont invalide
+            if re.search(r"^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])([a-zA-Z0-9]+){9,}$", password) is None:
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."
+                }))
+                return
+
             # Créer un fichier nommé 'passwd' dans user_datafile_path et encrypter le password dans le fichier
             if not os.path.isdir(user_datafile_path):
                 os.mkdir(user_datafile_path)
@@ -171,7 +179,7 @@ class Server:
                 "header": TP4_utils.message_header.OK,
                 "data": {}
             }))
-        return
+            self._connected_client_list.append(client_socket)
 
     def _process_client(self, client_socket: socket.socket) -> None:
         """
