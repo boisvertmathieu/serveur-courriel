@@ -160,6 +160,7 @@ class Client:
             return
 
         print("\n" + TP4_utils.EMAIL_DISPLAY.format(**message["data"]))
+        return
 
     def _sending(self) -> None:
         """
@@ -178,6 +179,7 @@ class Client:
         """
         destinataire = input("Adresse du destinataire: ")
         sujet = input("Sujet du message: ")
+        print("Contenu du courriel: (enrez '.' sur une ligne seule afin de terminer l'écriture)")
         corps = ""
         buffer = ""
         while buffer != ".":
@@ -195,7 +197,11 @@ class Client:
             "data": message.as_string()
         }))
 
-        # TODO : Valider si le serveur repond avec une erreur, si oui, on affiche l'erreur avant la fin de la fonction
+        message = self._recv_data()
+        if message["header"] == TP4_utils.message_header.ERROR:
+            print(message["data"])
+            return
+        return
 
     def _get_stats(self) -> None:
         """

@@ -196,31 +196,25 @@ class Server:
             self._client_count -= 1
             return
 
-        action = message["header"]
+        header = message["header"]
+        glo_msg = None
         try:
-            if action is TP4_utils.message_header.INBOX_READING_REQUEST:
-                username = message["data"]["username"]
-                glo_msg = self._get_subject_list(username)
-                glosocket.send_msg(client_socket, json.dumps({
-                    "header": glo_msg["header"],
-                    "data": glo_msg["data"]
-                }))
-            elif action is TP4_utils.message_header.INBOX_READING_CHOICE:
+            if header is TP4_utils.message_header.INBOX_READING_REQUEST:
+                glo_msg = self._get_subject_list(message["data"]["username"])
+            elif header is TP4_utils.message_header.INBOX_READING_CHOICE:
                 glo_msg = self._get_email(message["data"])
-                glosocket.send_msg(client_socket, json.dumps({
-                    "header": glo_msg["header"],
-                    "data": glo_msg["data"]
-                }))
-            elif action is TP4_utils.message_header.EMAIL_SENDING:
-                self._send_email(message["data"])
-            elif action is TP4_utils.message_header.STATS_REQUEST:
-                username = message["data"]["username"]
-                self._get_stats(username)
+            elif header is TP4_utils.message_header.EMAIL_SENDING:
+                glo_msg = self._send_email(message["data"])
+            elif header is TP4_utils.message_header.STATS_REQUEST:
+                glo_msg = self._get_stats(message["data"]["username"])
         except Exception as ex:
-            glosocket.send_msg(client_socket, json.dumps({
-                "header": TP4_utils.message_header.ERROR,
-                "data": ex
-            }))
+            glo_msg["header"] = TP4_utils.message_header.ERROR
+            glo_msg["data"] = ex
+
+        glosocket.send_msg(client_socket, json.dumps({
+            "header": glo_msg["header"],
+            "data": glo_msg["data"]
+        }))
 
     def _get_subject_list(self, username: str) -> TP4_utils.GLO_message:
         """
@@ -308,13 +302,14 @@ class Server:
 
         message = TP4_utils.GLO_message(
             header=TP4_utils.message_header.OK, data="Le courriel a été envoyé avec succès.")
+
         # Si l'adresse courriel de destination est une adresse ulaval
         if adresse_destination.split("@")[1] == "ulaval.ca":
             username_destination = adresse_destination.split("@")[0]
             dir_path = self._server_data_path + username_destination
 
             # Si l'utilisateur correspondant à l'adresse de destination est un utilisateur invalide
-            if not os.path.isdir(self._server_data_path + username_destination):
+            if not os.path.isdir(dir_path):
                 dir_path = self._server_lost_dir + username_destination
                 if not os.path.isdir(dir_path):
                     os.mkdir(dir_path)
