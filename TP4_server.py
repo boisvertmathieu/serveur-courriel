@@ -38,7 +38,10 @@ class Server:
 
         if not os.path.isdir(TP4_utils.SERVER_DATA_DIR):
             os.mkdir(TP4_utils.SERVER_DATA_DIR)
+        if not os.path.isdir(TP4_utils.SERVER_LOST_DIR):
+            os.mkdir(TP4_utils.SERVER_LOST_DIR)
         self._server_data_path = TP4_utils.SERVER_DATA_DIR
+        self._server_lost_dir = TP4_utils.SERVER_LOST_DIR
 
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@ulaval\.ca")
@@ -166,7 +169,6 @@ class Server:
                 }))
             else:
                 # Créer un fichier nommé 'passwd' dans user_datafile_path et encrypter le password dans le fichier
-                os.touch(user_datafile_path + "/passwd")
                 file = open(user_datafile_path + "/passwd", "w")
                 file.write(hashlib.sha384(password.encode()).hexdigest())
                 file.close()
@@ -187,16 +189,22 @@ class Server:
         message = glosocket.recv_msg(client_socket)
         if(message is not None):
             action = message["header"]
-            if(action is TP4_utils.message_header.INBOX_READING_REQUEST):
-                username = message["data"]["username"]
-                self._get_subject_list(username)
-            elif(action is TP4_utils.message_header.INBOX_READING_CHOICE):
-                self._get_email(message["data"])
-            elif(action is TP4_utils.message_header.EMAIL_SENDING):
-                self._send_email(message["data"])
-            elif(action is TP4_utils.message_header.STATS_REQUEST):
-                username = message["data"]["username"]
-                self._get_stats(username)
+            try:
+                if(action is TP4_utils.message_header.INBOX_READING_REQUEST):
+                    username = message["data"]["username"]
+                    self._get_subject_list(username)
+                elif(action is TP4_utils.message_header.INBOX_READING_CHOICE):
+                    self._get_email(message["data"])
+                elif(action is TP4_utils.message_header.EMAIL_SENDING):
+                    self._send_email(message["data"])
+                elif(action is TP4_utils.message_header.STATS_REQUEST):
+                    username = message["data"]["username"]
+                    self._get_stats(username)
+            except Exception as ex:
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": ex
+                }))
 
     def _get_subject_list(self, username: str) -> TP4_utils.GLO_message:
         """
@@ -270,7 +278,53 @@ class Server:
         Le GLO_message retourné contient indique si l’envoi a réussi
         ou non.
         """
-        # TODO
+        adresse_source = email_string.split("\n")[0].split(" ")[1]
+        adresse_destination = email_string.split("\n")[1].split(" ")[1]
+
+        # On vérifie si l'adresse source correspond à un utilisateur valide
+        username_source = adresse_source.split("@")[0]
+        if not os.path.isdir(self._server_data_path + username_source):
+            raise Exception(
+                "Aucun utilisateur existant n'est associé à l'adresse source.")
+
+        # Si l'adresse courriel de destination est une adresse ulaval
+        if adresse_destination.split("@")[1] == "ulaval.ca":
+            username_destination = adresse_destination.split("@")[0]
+            dir_path = self._server_data_path + username_destination
+            throw_ex = False
+
+            # Si l'utilisateur correspondant à l'adresse de destination est un utilisateur invalide
+            if not os.path.isdir(self._server_data_path + username_destination):
+                throw_ex = True
+                dir_path = self._server_lost_dir + username_destination
+                if not os.path.isdir(dir_path):
+                    os.mkdir(dir_path)
+
+            number_of_file_in_dir = len(
+                [name for name in os.listdir(dir_path) if os.path.isfile(name)])
+            filename = str(number_of_file_in_dir + 1) + username_destination
+
+            file = open(dir_path + "/" + filename, "w")
+            file.write(email_string)
+            file.close()
+
+            # Si l'utilisateur de destination était un utilisateur invalide, on retourne un message d'erreur
+            if throw_ex:
+                raise Exception("Adresse courriel de destinataire invalide.")
+        else:
+            # On essaie de se connecter au serveur smtp distant pour envoyer le courriel
+            destination_domain = adresse_destination.split("@")[1]
+            smtp_server = "smtp." + destination_domain
+
+            try:
+                with smtplib.SMTP(smtp_server, timeout=10) as server:
+                    message = email.message_from_string(email_string)
+                    server.send_message(message)
+            except smtplib.smtplib.SMTPException:
+                raise Exception("Le message n'a pas pu être envoyé")
+            except socket.timeout:
+                raise Exception(
+                    "La connexion au serveur SMTP n'a pas pu être établis")
 
     def _get_stats(self, username: str) -> TP4_utils.GLO_message:
         """

@@ -130,7 +130,26 @@ class Client:
         Note : un utilisateur termine la saisie avec un point sur une
         ligne
         """
-        # TODO
+        destinataire: string = input("Adresse du destinataire: ")
+        sujet: string = input("Sujet du message: ")
+        corps = ""
+        buffer = ""
+        while buffer != ".":
+            corps += buffer
+            buffer = input("") + '\n'
+
+        message = email.message.EmailMessage()
+        message["From"] = self._username + "@ulaval.ca"
+        message["To"] = destinataire
+        message["Subject"] = sujet
+        message.set_content(corps)
+
+        glosocket.send_msg(self.socket_client, json.dumps({
+            "header": TP4_utils.message_header.EMAIL_SENDING,
+            "data": message.as_string()
+        }))
+
+        # TODO : Valider si le serveur repond avec une erreur, si oui, on affiche l'erreur avant la fin de la fonction
 
     def _get_stats(self) -> None:
         """
@@ -139,7 +158,7 @@ class Client:
         Cette fonction, dans l’ordre :
         - Envoie une requête de statistique au serveur.
         - Récupère les statistiques depuis le serveur.
-        - Affiche les statistiques dans le terminal avec le gabarit 
+        - Affiche les statistiques dans le terminal avec le gabarit
             STATS_DISPLAY.
         """
         # TODO
