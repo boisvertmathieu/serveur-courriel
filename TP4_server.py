@@ -45,7 +45,6 @@ class Server:
 
         self._email_verificator = re.compile(
             r"\b[A-Za-z0-9._%+-]+@ulaval\.ca")
-        self.message = ""
 
     def _recv_data(self, source: socket.socket) -> Optional[TP4_utils.GLO_message]:
         """
@@ -92,12 +91,10 @@ class Server:
             for client in waiting_list:
                 if client == self._server_socket:
                     self._accept_client()
-                else:
-                    self.message = self._recv_data(client)
-                    if self.message["header"] == TP4_utils.message_header.AUTH_REGISTER or \
-                            self.message["header"] == TP4_utils.message_header.AUTH_LOGIN:
-                        self._authenticate_client(client)
+                elif client in self._connected_client_list:
                     self._process_client(client)
+                else:
+                    self._authenticate_client(client)
 
     def _accept_client(self) -> None:
         """
@@ -118,7 +115,7 @@ class Server:
         conformant à la classe d’annotation GLO_message. Si nécessaire, le client
         est également ajouté aux listes appropriées.
         """
-        message = self.message
+        message = self._recv_data(client_socket)
         username = message["data"]["username"]
         password = message["data"]["password"]
         header = message["header"]
@@ -189,12 +186,7 @@ class Server:
         Sinon, la méthode traite la requête et répond au client avec un JSON
         conformant à la classe d’annotation GLO_message.
         """
-        message = self.message
-        if message is None:
-            self._connected_client_list.remove(client_socket)
-            self._client_socket_list.remove(client_socket)
-            self._client_count -= 1
-            return
+        message = self._recv_data(client_socket)
 
         header = message["header"]
         glo_msg = {}
