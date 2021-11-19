@@ -156,12 +156,12 @@ class Server:
             if os.path.isdir(user_datafile_path):
                 glosocket.send_msg(client_socket, json.dumps({
                     "header": TP4_utils.message_header.ERROR,
-                    "data": "Le nom d'utilisateur est déjà prit."
+                    "data": "Le nom d'utilisateur est déjà pris."
                 }))
                 return
 
             # Valider sur le username et password sont invalide
-            if re.search(r"^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])([a-zA-Z0-9]+){9,}$", password) is None:
+            if re.search(r"(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])", password) is None:
                 glosocket.send_msg(client_socket, json.dumps({
                     "header": TP4_utils.message_header.ERROR,
                     "data": "Le mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre."
