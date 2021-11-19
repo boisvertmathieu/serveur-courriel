@@ -177,10 +177,10 @@ class Client:
         Note: un utilisateur termine la saisie avec un point sur une
         ligne
         """
-        destinataire:str = input("Adresse du destinataire: ")
-        sujet: str = input("Sujet du message: ")
+        destinataire:str = input("Entrez l'adresse de destination :")
+        sujet: str = input("Entrez le sujet : ")
 
-        print("\n*** Contenu du courriel: (enrez '.' sur une ligne seule afin de terminer l'écriture) ***")
+        print("\nEntrez le message, terminez la saisie avec '.' sur une ligne.")
         corps = ""
         buffer = ""
         while buffer != ".\n":
@@ -188,7 +188,7 @@ class Client:
             buffer = input("") + '\n'
 
         message = email.message.EmailMessage()
-        message["From"] = self._username + "@ulaval.ca"
+        message["From"] = self._username + "@" + TP4_utils.SERVER_DOMAIN
         message["To"] = destinataire
         message["Subject"] = sujet
         message.set_content(corps)
