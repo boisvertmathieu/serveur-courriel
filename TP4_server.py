@@ -302,8 +302,8 @@ class Server:
         message = TP4_utils.GLO_message(
             header=TP4_utils.message_header.OK, data="Le courriel a été envoyé avec succès.")
 
-        # Si l'adresse courriel de destination est une adresse ulaval
-        if adresse_destination.split("@")[1] == "ulaval.ca":
+        # Si l'adresse courriel de destination est une adresse glo-2000
+        if adresse_destination.split("@")[1] == TP4_utils.SERVER_DOMAIN:
             username_destination = adresse_destination.split("@")[0]
             dir_path = self._server_data_path + username_destination
 
@@ -316,8 +316,8 @@ class Server:
                 message = TP4_utils.GLO_message(
                     header=TP4_utils.message_header.ERROR, data="L'adresse de destination n'existe pas")
 
-            number_of_file_in_dir = len(
-                [name for name in os.listdir(dir_path) if os.path.isfile(name)])
+            #trouver le numeros du courriel et ne pas compter le fichier du mot de passe
+            number_of_file_in_dir = len(os.listdir(dir_path)) - 1
             filename = str(number_of_file_in_dir + 1) + '-' + username_destination
 
             with open(os.path.join(dir_path, filename), "w") as f:
