@@ -356,23 +356,26 @@ class Server:
         indique l’erreur au client.
         """
 
-        print("get stats start")
-
         # On valide si le user existe
         user_dir_path = os.path.join(self._server_data_path, username)
+        print(f"User dir path: {user_dir_path}")
         if not os.path.isdir(user_dir_path):
             return TP4_utils.GLO_message(
                 header=TP4_utils.message_header.ERROR,
                 data="L'utilisateur n'existe pas."
             )
 
-        # Compte le nombre de fichiers dans le dossier de l'utilisateur
-        nombre_de_fichier = len(os.path.listdir(user_dir_path))
+        # Compte le nombre de fichiers dans le dossier de l'utilisateur (en excluant le fichier du mot de passe)
+        nombre_de_fichier = -1
+        for path in os.listdir(user_dir_path):
+            nombre_de_fichier += 1
+        print(f"Nombre de fichier: {nombre_de_fichier}")
 
         # Compte la taille du dossier de l'utilisateur
         taille_du_dossier = sum(
             os.path.getsize(self._server_data_path + username + "/" + name) for name in os.listdir(
                 self._server_data_path + username) if os.path.isfile(name))
+        print(f"Taille du dossier: {taille_du_dossier}")
 
         return TP4_utils.GLO_message(
             header=TP4_utils.message_header.OK,
