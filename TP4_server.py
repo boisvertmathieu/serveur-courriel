@@ -358,6 +358,7 @@ class Server:
 
         # On valide si le user existe
         user_dir_path = os.path.join(self._server_data_path, username)
+
         if not os.path.isdir(user_dir_path):
             return TP4_utils.GLO_message(
                 header=TP4_utils.message_header.ERROR,
@@ -371,8 +372,7 @@ class Server:
 
         # Compte la taille du dossier de l'utilisateur
         taille_du_dossier = sum(
-            os.path.getsize(self._server_data_path + username + "/" + name) for name in os.listdir(
-                self._server_data_path + username) if os.path.isfile(name))
+            d.stat().st_size for d in os.scandir('.') if d.is_file())
 
         return TP4_utils.GLO_message(
             header=TP4_utils.message_header.OK,
