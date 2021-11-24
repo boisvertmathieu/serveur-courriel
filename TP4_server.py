@@ -247,13 +247,9 @@ class Server:
         """
 
         username = data["username"]
-        print(f"Username : {username}")
         choix = data["choice"]
-        print(f"choix: {choix}")
         user_dir_path = os.path.join(self._server_data_path, username)
-        print(f"user data dir: {user_dir_path}")
         filename = choix + '-' + username
-        print(f"filename: {filename}")
 
         if os.path.isfile(os.path.join(user_dir_path, filename)):
             with open(os.path.join(user_dir_path, filename)) as f:
@@ -261,7 +257,8 @@ class Server:
                 source = formatted_content[0].split(' ')[1]
                 destination = formatted_content[1].split(' ')[1]
                 subject = formatted_content[2].split(' ')[1]
-                content = formatted_content[-2]
+                content = '\n'.join(formatted_content[6:])
+
                 return TP4_utils.GLO_message(
                     header=TP4_utils.message_header.OK,
                     data={"source": source, "destination": destination,
@@ -361,9 +358,16 @@ class Server:
 
         print("get stats start")
 
+        # On valide si le user existe
+        user_dir_path = os.path.join(self._server_data_path, username)
+        if not os.path.isdir(user_dir_path):
+            return TP4_utils.GLO_message(
+                header=TP4_utils.message_header.ERROR,
+                data="L'utilisateur n'existe pas."
+            )
+
         # Compte le nombre de fichiers dans le dossier de l'utilisateur
-        nombre_de_fichier = len([name for name in os.listdir(
-            self._server_data_path + username) if os.path.isfile(name)])
+        nombre_de_fichier = len(os.path.listdir(user_dir_path))
 
         # Compte la taille du dossier de l'utilisateur
         taille_du_dossier = sum(
