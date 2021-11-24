@@ -372,7 +372,7 @@ class Server:
 
         # Compte la taille du dossier de l'utilisateur
         taille_du_dossier = sum(
-            d.stat().st_size for d in os.scandir('.') if d.is_file())
+            d.stat().st_size for d in os.scandir(user_dir_path) if d.is_file())
 
         return TP4_utils.GLO_message(
             header=TP4_utils.message_header.OK,
