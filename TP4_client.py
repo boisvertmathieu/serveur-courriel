@@ -144,7 +144,8 @@ class Client:
         for subject in message["data"]["subjects"]:
             print(subject)
 
-        choix: str = input("Entrez le numéro du courriel que vous voulez consulter: ")
+        choix: str = input(
+            "Entrez le numéro du courriel que vous voulez consulter: ")
         if re.search(r"^[0-9]$", choix) is None:
             print("\nErreur lors du choix des courriels disponibles.\n")
             return
@@ -177,7 +178,7 @@ class Client:
         Note: un utilisateur termine la saisie avec un point sur une
         ligne
         """
-        destinataire:str = input("Entrez l'adresse de destination :")
+        destinataire: str = input("Entrez l'adresse de destination :")
         sujet: str = input("Entrez le sujet : ")
 
         print("\nEntrez le message, terminez la saisie avec '.' sur une ligne.")
@@ -214,9 +215,11 @@ class Client:
         - Affiche les statistiques dans le terminal avec le gabarit
             STATS_DISPLAY.
         """
+        print("get stats")
 
         glosocket.send_msg(self.socket_client, json.dumps({
             "header": TP4_utils.message_header.STATS_REQUEST,
+            "data": {"username", self._username}
         }))
 
         message = self._recv_data()

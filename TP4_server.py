@@ -359,6 +359,8 @@ class Server:
         indique l’erreur au client.
         """
 
+        print("get stats start")
+
         # Compte le nombre de fichiers dans le dossier de l'utilisateur
         nombre_de_fichier = len([name for name in os.listdir(
             self._server_data_path + username) if os.path.isfile(name)])
