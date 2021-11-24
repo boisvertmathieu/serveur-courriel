@@ -217,19 +217,20 @@ class Server:
         Si le nom d’utilisateur est invalide, le GLO_message retourné
         indique l’erreur au client.
         """
-        user_dir_path = self._server_data_path + username
+        user_dir_path = os.path.join(self._server_data_path, username)
         if os.path.isdir(user_dir_path):
             subjects = []
             for file in os.listdir(user_dir_path):
                 # On valide si le fichier est du bon nom (si c'est un courriel)
-                if re.search("^[1-9]+-" + username + "$", file) is not None:
+                if re.search(f"^[1-9]+-{username}$", file) is not None:
                     with open(os.path.join(user_dir_path, file), "r") as f:
                         content = f.read()
                         # On récupère le sujet, le numéro et la source
                         number = file.split('-')[0]
-                        subject = content.split('\\n')[2].split(' ')[1]
-                        source = content.split('\\n')[0].split(' ')[1]
-                        subjects.append(TP4_utils.SUBJECT_DISPLAY.format(number=number, subject=subject, source=source))
+                        subject = content.split('\n')[2].split(' ')[1]
+                        source = content.split('\n')[0].split(' ')[1]
+                        subjects.append(TP4_utils.SUBJECT_DISPLAY.format(
+                            number=number, subject=subject, source=source))
             return TP4_utils.GLO_message(header=TP4_utils.message_header.OK, data={"subjects": subjects})
         else:
             return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data={})
@@ -245,22 +246,26 @@ class Server:
         if(usernameExists):
         """
 
-        message = self.message
-        username = message["data"]["username"]
-        user_dir_path = self._server_data_path + username
-        choix = message["data"]["choice"]
-
+        username = data["username"]
+        print(f"Username : {username}")
+        choix = data["choice"]
+        print(f"choix: {choix}")
+        user_dir_path = os.path.join(self._server_data_path, username)
+        print(f"user data dir: {user_dir_path}")
         filename = choix + '-' + username
+        print(f"filename: {filename}")
+
         if os.path.isfile(os.path.join(user_dir_path, filename)):
             with open(os.path.join(user_dir_path, filename)) as f:
-                formatted_content = f.read().split('\\n')
+                formatted_content = f.read().split('\n')
                 source = formatted_content[0].split(' ')[1]
                 destination = formatted_content[1].split(' ')[1]
                 subject = formatted_content[2].split(' ')[1]
                 content = formatted_content[-2]
                 return TP4_utils.GLO_message(
                     header=TP4_utils.message_header.OK,
-                    data={"source": source, "destination": destination, "subject": subject, "content": content}
+                    data={"source": source, "destination": destination,
+                          "subject": subject, "content": content}
                 )
         else:
             return TP4_utils.GLO_message(
@@ -286,7 +291,7 @@ class Server:
         adresse_source = email_string.split("\n")[0].split(" ")[1]
         adresse_destination = email_string.split("\n")[1].split(" ")[1]
 
-        # On vérifie si l'adresse source correspond à un utilisateur valide
+        # On vérifie si l'adresse source n'est pas un utilisateur valide
         username_source = adresse_source.split("@")[0]
         if not os.path.isdir(self._server_data_path + username_source):
             return TP4_utils.GLO_message(header=TP4_utils.message_header.ERROR, data="L'adresse source n'existe pas")
@@ -297,7 +302,8 @@ class Server:
         # Si l'adresse courriel de destination est une adresse glo-2000
         if adresse_destination.split("@")[1] == TP4_utils.SERVER_DOMAIN:
             username_destination = adresse_destination.split("@")[0]
-            dir_path = self._server_data_path + username_destination
+            dir_path = os.path.join(
+                self._server_data_path, username_destination)
 
             # Si l'utilisateur correspondant à l'adresse de destination est un utilisateur invalide
             if not os.path.isdir(dir_path):
@@ -308,9 +314,12 @@ class Server:
                 message = TP4_utils.GLO_message(
                     header=TP4_utils.message_header.ERROR, data="L'adresse de destination n'existe pas")
 
-            #trouver le numeros du courriel et ne pas compter le fichier du mot de passe
+            # trouver le numeros du courriel et ne pas compter le fichier du mot de passe
             number_of_file_in_dir = len(os.listdir(dir_path)) - 1
-            filename = str(number_of_file_in_dir + 1) + '-' + username_destination
+            print(
+                f"Number of file in destination user dir: {number_of_file_in_dir}")
+            filename = str(number_of_file_in_dir + 1) + \
+                '-' + username_destination
 
             with open(os.path.join(dir_path, filename), "w") as f:
                 f.write(email_string)
