@@ -60,8 +60,8 @@ class Server:
         try:
             message = json.loads(message)
             if "header" not in message or "data" not in message:
-                raise json.JSONDecodeError
-        except (json.JSONDecodeError, TypeError):
+                raise Exception()
+        except Exception as ex:
             # Le json est invalide ou est none
             source.close()
             self._connected_client_list.remove(source)
@@ -297,7 +297,8 @@ class Server:
             header=TP4_utils.message_header.OK, data="Le courriel a été envoyé avec succès.")
 
         # Si l'adresse courriel de destination est une adresse glo-2000
-        if adresse_destination.split("@")[1] == TP4_utils.SERVER_DOMAIN:
+        destination_domain = adresse_destination.split("@")[1]
+        if destination_domain == TP4_utils.SERVER_DOMAIN:
             username_destination = adresse_destination.split("@")[0]
             dir_path = os.path.join(
                 self._server_data_path, username_destination)
@@ -325,16 +326,17 @@ class Server:
 
         # On essaie de se connecter au serveur smtp distant pour envoyer le courriel
         destination_domain = adresse_destination.split("@")[1]
-        smtp_server = "smtp." + destination_domain
+        print("destination domain: " + destination_domain)
         try:
-            with smtplib.SMTP(smtp_server, timeout=10) as server:
+            with smtplib.SMTP(host="smtp." + destination_domain, timeout=10) as server:
                 message = email.message_from_string(email_string)
                 server.send_message(message)
+                print("Courriel envoyé.")
                 return TP4_utils.GLO_message(
                     header=TP4_utils.message_header.OK,
                     data="Le courriel a été envoyé avec succès."
                 )
-        except smtplib.smtplib.SMTPException:
+        except smtplib.SMTPException:
             return TP4_utils.GLO_message(
                 header=TP4_utils.message_header.ERROR,
                 data="Le message n'a pas pu être envoyé"
