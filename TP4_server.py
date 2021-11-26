@@ -188,6 +188,9 @@ class Server:
         """
         message = self._recv_data(client_socket)
 
+        # Si le client s'est déconnecté
+        if message is None : return
+
         header = message["header"]
         glo_msg = {}
         try:
@@ -288,6 +291,19 @@ class Server:
         adresse_source = email_string.split("\n")[0].split(" ")[1]
         adresse_destination = email_string.split("\n")[1].split(" ")[1]
 
+        # On vérifie si les adresses courriels sont valides
+        if (re.search(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)", adresse_source) is None): 
+            return TP4_utils.GLO_message(
+                header=TP4_utils.message_header.ERROR,
+                data="L'adresse source n'est pas une adresse courriel valide."
+            )
+        
+        if (re.search(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)", adresse_destination) is None): 
+            return TP4_utils.GLO_message(
+                header=TP4_utils.message_header.ERROR,
+                data="L'adresse destination n'est pas une adresse courriel valide."
+            )
+
         # On vérifie si l'adresse source n'est pas un utilisateur valide
         username_source = adresse_source.split("@")[0]
         if not os.path.isdir(self._server_data_path + username_source):
@@ -324,14 +340,12 @@ class Server:
 
             return message
 
-        # On essaie de se connecter au serveur smtp distant pour envoyer le courriel
+        # On essaie de se connecter au serveur smtp distant pour envoyer le courriel externe
         destination_domain = adresse_destination.split("@")[1]
-        print("destination domain: " + destination_domain)
         try:
-            with smtplib.SMTP(host="smtp." + destination_domain, timeout=10) as server:
+            with smtplib.SMTP(host=TP4_utils.SMTP_SERVER, timeout=10) as server:
                 message = email.message_from_string(email_string)
                 server.send_message(message)
-                print("Courriel envoyé.")
                 return TP4_utils.GLO_message(
                     header=TP4_utils.message_header.OK,
                     data="Le courriel a été envoyé avec succès."
