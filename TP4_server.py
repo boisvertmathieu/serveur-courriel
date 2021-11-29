@@ -158,6 +158,13 @@ class Server:
                 return
 
             # Valider sur le username et password sont invalide
+            if re.search(r"\s", username) is not None:
+                glosocket.send_msg(client_socket, json.dumps({
+                    "header": TP4_utils.message_header.ERROR,
+                    "data": "Le nom d'utilisateur ne doit pas contenir d'espace."
+                }))
+                return
+
             if re.search(r"(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])", password) is None:
                 glosocket.send_msg(client_socket, json.dumps({
                     "header": TP4_utils.message_header.ERROR,
