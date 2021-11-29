@@ -202,7 +202,8 @@ class Client:
         message = self._recv_data()
         if message["header"] == TP4_utils.message_header.ERROR:
             print(message["data"])
-            return
+        if message["header"] == TP4_utils.message_header.OK:
+            print(message["data"])
         return
 
     def _get_stats(self) -> None:
