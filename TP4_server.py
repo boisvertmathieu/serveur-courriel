@@ -116,8 +116,8 @@ class Server:
         est également ajouté aux listes appropriées.
         """
         message = self._recv_data(client_socket)
-        username = message["data"]["username"]
-        password = message["data"]["password"]
+        username: str = message["data"]["username"]
+        password: str = message["data"]["password"]
         header = message["header"]
 
         user_datafile_path = self._server_data_path + username
@@ -196,7 +196,8 @@ class Server:
         message = self._recv_data(client_socket)
 
         # Si le client s'est déconnecté
-        if message is None : return
+        if message is None:
+            return
 
         header = message["header"]
         glo_msg = {}
@@ -299,13 +300,13 @@ class Server:
         adresse_destination = email_string.split("\n")[1].split(" ")[1]
 
         # On vérifie si les adresses courriels sont valides
-        if (re.search(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)", adresse_source) is None): 
+        if (re.search(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)", adresse_source) is None):
             return TP4_utils.GLO_message(
                 header=TP4_utils.message_header.ERROR,
                 data="L'adresse source n'est pas une adresse courriel valide."
             )
-        
-        if (re.search(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)", adresse_destination) is None): 
+
+        if (re.search(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)", adresse_destination) is None):
             return TP4_utils.GLO_message(
                 header=TP4_utils.message_header.ERROR,
                 data="L'adresse destination n'est pas une adresse courriel valide."
